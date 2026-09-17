@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
+	<moduleName>Nordic Skyforged Armor and Weapons</moduleName>
+	<moduleImage path="fomod\images\header.png" showImage="true" showFade="true" height="-1" />
+
+	<!-- The meshes and the plugin are the same whatever you pick below, so they install once. -->
+	<requiredInstallFiles>
+		<folder source="00 Core" destination="" priority="0" />
+	</requiredInstallFiles>
+
+	<installSteps order="Explicit">
+		<installStep name="Texture resolution">
+			<optionalFileGroups order="Explicit">
+				<group name="Texture resolution" type="SelectExactlyOne">
+					<plugins order="Explicit">
+						<plugin name="2K - recommended">
+							<description>Xtudo's black textures at 2K. What the set was authored around, and about 90 MB of VRAM less than 4K for a difference you will not see on a cuirass.</description>
+							<files><folder source="02 Textures - 2K" destination="" priority="1" /></files>
+							<typeDescriptor><type name="Recommended" /></typeDescriptor>
+						</plugin>
+						<plugin name="4K">
+							<description>The same textures at 4K. Worth it for close screenshots; otherwise it is VRAM for nothing.</description>
+							<files><folder source="03 Textures - 4K" destination="" priority="1" /></files>
+							<typeDescriptor><type name="Optional" /></typeDescriptor>
+						</plugin>
+						<plugin name="1K">
+							<description>The same textures at 1K, for a machine that is short of VRAM.</description>
+							<files><folder source="01 Textures - 1K" destination="" priority="1" /></files>
+							<typeDescriptor><type name="Optional" /></typeDescriptor>
+						</plugin>
+					</plugins>
+				</group>
+			</optionalFileGroups>
+		</installStep>
+	</installSteps>
+</config>
