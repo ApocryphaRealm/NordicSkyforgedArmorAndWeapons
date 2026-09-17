@@ -19,3 +19,13 @@ leave wolf alone"*, and *"SKYFORGED IS BUILT FROM LEGACY OF YSGRAMOR WOLF ARMOR 
 * The shipped meshes have their texture paths rewritten to this mod's own folder (a same-length
   rewrite, so the files need no re-parsing), which is what lets it sit beside Legacy of Ysgramor
   without recolouring that mod's Wolf Armor.
+* **Fixed before release: the helmet was invisible** (the owner, 2026-09-17: *"the skyforged made
+  the head look wierd"*). The helmet's ARMO carries one armour-addon link per race family, four in
+  all; the generator had packed the four FormIDs into a single 16-byte `MODL` subrecord, which the
+  engine reads as one FormID and discards. One `MODL` per addon now, and the package gate refuses
+  any ARMO whose `MODL` is not 4 bytes.
+* **HIMBO and CBBE 3BA options in the installer.** Prebuilt HIMBO male meshes (zeroed sliders) and
+  HIMBO BodySlide files from Trexasle's Legacy of Ysgramor - HIMBO Conversion (Nexus 110002), and
+  CBBE 3BA BodySlide files from Xonek's Legacy of Ysgramor - 3BA Bodyslide (Nexus 111209), renamed
+  and repathed to this mod's folders by `tools/loy-refits.py`, texture paths rewritten the same way
+  as the base meshes. The 3BA set is BodySlide-only: build it once.

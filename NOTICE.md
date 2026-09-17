@@ -23,6 +23,15 @@ leaves that mod's Wolf Armor exactly as it was.
 **Permissions.** Per the owner's standing policy for our asset mods, set 2026-09-16, the mod page
 names both authors and links back to both mod pages.
 
+## The body refits - HIMBO and CBBE 3BA options
+
+[Nexus 110002](https://www.nexusmods.com/skyrimspecialedition/mods/110002), **Legacy of Ysgramor - HIMBO
+Conversion** by **Trexasle**: the prebuilt HIMBO male meshes and the HIMBO BodySlide slider sets and
+shape data. [Nexus 111209](https://www.nexusmods.com/skyrimspecialedition/mods/111209), **Legacy of
+Ysgramor - 3BA Bodyslide** by **Xonek**: the CBBE 3BA slider sets and shape data. Both are installed
+as optional choices, renamed and repathed to this mod's folders by `tools/loy-refits.py`; the mod page
+names both authors and links back to both pages.
+
 ## What IS ours
 
 `tools/`, `fomod/ModuleConfig.xml`, the plugin generator and the documentation.

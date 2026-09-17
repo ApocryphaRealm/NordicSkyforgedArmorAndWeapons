@@ -207,6 +207,15 @@ def main(out_root=None, test=False):
             found += 1
         n_tex[res] = found
 
+    # ---- body options: HIMBO (prebuilt male meshes + BodySlide) and CBBE 3BA (BodySlide), from the
+    # two Legacy of Ysgramor refits on Nexus (110002, 111209); see tools/loy-refits.py
+    r = subprocess.run([sys.executable, os.path.join(HERE, "loy-refits.py"), "--profile", "skyforged",
+                        "--out", out_root, "--first", "30"], capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("body options failed:\n" + (r.stdout + r.stderr).strip())
+    for line in r.stdout.strip().splitlines():
+        print(line)
+
     # ---- fomod
     fomod = os.path.join(out_root, "fomod")
     os.makedirs(os.path.join(fomod, "images"), exist_ok=True)

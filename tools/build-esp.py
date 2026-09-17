@@ -299,11 +299,18 @@ def main():
             elif s in (b"MO2T", b"MO4T", b"MOD4"):
                 continue
             elif s == b"MODL":
-                # the template may carry MODL once per race addon (the wolf helmet does); ours
-                # is written once, as one array, at the first of them
+                # ONE MODL SUBRECORD PER ADDON, 4 bytes each - the way the template carries them.
+                # The first cut packed all four helmet addons into a single 16-byte MODL; the
+                # engine reads MODL as one FormID and threw the record's addon list away, so the
+                # Skyforge Steel Helmet was invisible while Legacy of Ysgramor's own helmet, on
+                # otherwise identical records, rendered (the owner, 2026-09-17: "the skyforged
+                # made the head look wierd"). Written at the first template MODL, in addon order;
+                # the template's later MODLs are dropped.
                 if any(x[0] == b"MODL" for x in subs):
                     continue
-                v = b"".join(struct.pack("<I", arma_fid[ad]) for ad in addons)
+                for ad in addons:
+                    subs.append((b"MODL", struct.pack("<I", arma_fid[ad])))
+                continue
             elif s == b"DESC":
                 v = b"\x00"
             subs.append((s, v))
