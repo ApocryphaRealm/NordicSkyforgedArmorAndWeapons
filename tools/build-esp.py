@@ -19,7 +19,7 @@ WHAT THE PLUGIN DOES
        armor, leave wolf alone".
 
     3. ADDS the Skyforge Steel weapon types the game has none of (the owner, 2026-11-15: the same
-       weapon types the Nordic Ebony replacer gained), one at a time - so far the MACE, the WARHAMMER and the
+       weapon types the Nordic Ebony replacer gained), one at a time - so far the MACE, the WARHAMMER, the BOW and the
        ARROW (NEW_AMMO: its own projectile, the quiver is part of the arrow's model). See
        NEW_WEAPONS: the vanilla Steel record plus the vanilla Skyforge uplift, its own first-person
        static, forged at the Skyforge, tempered like the Skyforge war axe. Meshes from
@@ -93,6 +93,12 @@ NEW_WEAPONS = {
                           "1stPersonSteelMace", "one-handed"),
     "SkyforgeSteelWarhammer": ("Skyforge Steel Warhammer", "SteelWarhammer", "RecipeWeaponSteelWarhammer", "Warhammer.nif",
                                "1stPersonWarhammer.nif", "1stPersonSteelWarhammer", "two-handed"),
+    # the game has no Steel bow: the Imperial Bow is its steel-tier bow (tempered with a steel ingot) and is not craftable,
+    # so the recipe is written here - 3 steel ingots + 1 leather strips, as the game's own Skyforge bow recipe (Nord Hero
+    # Bow: 3 steel ingots + 1 more item) and the Ebony bow (3 ingots); tempered with its Imperial Bow recipe. Its first-
+    # person static points at the same file as the third-person model, as vanilla's skinned bows and the Ebony bow do.
+    "SkyforgeSteelBow": ("Skyforge Steel Bow", "ImperialBow", [(INGOT_STEEL, 3), (LEATHER_STRIPS, 1)], "Bow.nif", "Bow.nif",
+                         "1stPersonEbonyBow", "two-handed", "TemperWeaponImperialBow"),
 }
 SKYFORGE_UPLIFT = {"one-handed": {"damage": 3, "value": 25}, "two-handed": {"damage": 3, "value": 50}}
 # the arrow: the game has no Skyforge Steel arrow (its only Skyforge-made arrow is the Nord Hero arrow, damage 24, a far
@@ -391,7 +397,9 @@ def main():
 
     # ---- 5. new weapon types: vanilla Steel bodies + the Skyforge uplift, own first-person static, forge and temper
     new_weapon_meshes = []
-    for our_edid, (full, template, recipe, mesh3, mesh1, stat_template, hands) in NEW_WEAPONS.items():
+    for our_edid, spec in NEW_WEAPONS.items():
+        full, template, recipe, mesh3, mesh1, stat_template, hands = spec[:7]
+        temper_template = spec[7] if len(spec) > 7 else NEW_WEAPON_TEMPER
         st = skyrim.get(stat_template)
         stat_edid = "1stPerson" + our_edid
         stat_fid = allot(stat_edid)
@@ -439,24 +447,32 @@ def main():
                 fail("%s has no %s" % (template, need.decode()))
         check_refs("WEAP", subs, sky_ix, our_edid)
         records.append(("WEAP", fid, src["ver"], subs))
-        new_weapon_meshes += ["%s\\weapons\\%s" % (MESH_ROOT, mesh3), "%s\\weapons\\%s" % (MESH_ROOT, mesh1)]
+        for m_ in dict.fromkeys(["%s\\weapons\\%s" % (MESH_ROOT, mesh3), "%s\\weapons\\%s" % (MESH_ROOT, mesh1)]):
+            new_weapon_meshes.append(m_)
 
-        # forge at the Skyforge: the vanilla Steel recipe, created object and workbench swapped
-        rc = skyrim.get(recipe)
+        # forge at the Skyforge: the vanilla Steel recipe, created object and workbench swapped (or written, see the bow)
         rfid = allot("Recipe" + our_edid)
-        subs = []
-        for s, v in rc["subs"]:
-            if s == b"EDID":
-                v = ("Recipe" + our_edid).encode("latin-1") + b"\x00"
-            elif s == b"CNAM":
-                v = struct.pack("<I", fid)
-            elif s == b"BNAM":
-                v = struct.pack("<I", K_SKYFORGE)
-            subs.append((s, v))
+        if isinstance(recipe, str):
+            rc = skyrim.get(recipe); rver = rc["ver"]
+            subs = []
+            for s, v in rc["subs"]:
+                if s == b"EDID":
+                    v = ("Recipe" + our_edid).encode("latin-1") + b"\x00"
+                elif s == b"CNAM":
+                    v = struct.pack("<I", fid)
+                elif s == b"BNAM":
+                    v = struct.pack("<I", K_SKYFORGE)
+                subs.append((s, v))
+        else:
+            rver = temper_ver
+            subs = [(b"EDID", ("Recipe" + our_edid).encode("latin-1") + b"\x00"), (b"COCT", struct.pack("<I", len(recipe)))]
+            subs += [(b"CNTO", struct.pack("<II", item, n_)) for item, n_ in recipe]
+            subs += [(b"CTDA", ctda_has_perk(PERK_STEEL)), (b"CNAM", struct.pack("<I", fid)), (b"BNAM", struct.pack("<I", K_SKYFORGE)),
+                     (b"NAM1", struct.pack("<H", 1))]
         check_refs("COBJ", subs, sky_ix, "Recipe" + our_edid)
-        records.append(("COBJ", rfid, rc["ver"], subs))
+        records.append(("COBJ", rfid, rver, subs))
         # temper: the vanilla Skyforge war axe's recipe with the created object swapped
-        tc = skyrim.get(NEW_WEAPON_TEMPER)
+        tc = skyrim.get(temper_template)
         tfid = allot("Temper" + our_edid)
         subs = []
         for s, v in tc["subs"]:

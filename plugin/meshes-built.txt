@@ -2,5 +2,6 @@ NordicSkyforge\weapons\Mace.nif
 NordicSkyforge\weapons\1stPersonMace.nif
 NordicSkyforge\weapons\Warhammer.nif
 NordicSkyforge\weapons\1stPersonWarhammer.nif
+NordicSkyforge\weapons\Bow.nif
 NordicSkyforge\weapons\Arrow.nif
 NordicSkyforge\weapons\ArrowProjectile.nif

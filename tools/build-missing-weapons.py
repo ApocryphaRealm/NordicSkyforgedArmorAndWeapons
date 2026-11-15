@@ -7,6 +7,8 @@ BUILT SO FAR
     mace       ->  meshes\NordicSkyforge\weapons\Mace.nif and 1stPersonMace.nif       (missing_weapons\stage_mace.py)
     warhammer  ->  meshes\NordicSkyforge\weapons\Warhammer.nif and 1stPersonWarhammer.nif (missing_weapons\stage_warhammer.py)
     arrow      ->  meshes\NordicSkyforge\weapons\Arrow.nif (with the quiver) and ArrowProjectile.nif (missing_weapons\stage_arrow.py)
+    bow        ->  meshes\NordicSkyforge\weapons\Bow.nif (the Ebony r03 bow, ebony_pipeline\ + assemble_bow.py; its first-person
+                   record uses the same file)
 
 WHERE THE ART COMES FROM
     Every piece is cut from NordwarUA's own STEEL Wolf war axe (Legacy of Ysgramor, Nexus 109963 - modification and
@@ -56,12 +58,26 @@ ITEMS = {
               "extra_loy": {"NSAW_DAGGER": "Dagger.nif"},
               "outputs": {"Arrow.nif": ("ebonyarrow.nif", ("Arrow:0", "ArrowQuiver:0", "ArrowQuiver:1") + tuple("Arrow%d" % k for k in range(1, 7))),
                           "ArrowProjectile.nif": ("ebonyarrowprojectile.nif", ("EbonyArrowFlight:0",))}},
+    # the bow: the Ebony replacer's approved r03 bow built by its own pipeline (missing_weapons\ebony_pipeline\, copied
+    # unchanged), then moved onto the steel sword's and steel war axe's textures by missing_weapons\assemble_bow.py
+    "bow": {"kind": "bow", "loy": "Sword.nif", "env": "NSAW_SWORD", "van_env": "NSAW_VAN_BOW",
+            "outputs": {"Bow.nif": ("ebonybowskinned.nif", ("BowMesh:0", "BowMesh:1"))}},
 }
+# the Ebony pipeline's inputs: Legacy of Ysgramor's ebony weapons under the vanilla names it reads them by, and the vanilla
+# ebony meshes it builds on (the Ebony replacer's build-missing-weapons.py LOY and VANILLA lists)
+EBONY_LOY = {"SwordEbony.nif": "ebonysword.nif", "GreatswordEbony.nif": "ebonygreatsword.nif", "AxeEbony.nif": "ebonywaraxe.nif",
+             "BattleAxeEbony.nif": "ebonybattleaxe.nif", "DaggerEbony.nif": "ebonydagger.nif", "ShieldEbony.nif": "ebonyshield.nif"}
+EBONY_VANILLA = ["ebonymace.nif", "1stpersonebonymace.nif", "ebonywarhammer.nif", "1stpersonebonywarhammer.nif",
+                 "ebonybowskinned.nif", "ebonyarrow.nif", "ebonyarrowprojectile.nif",
+                 "ebonysword.nif", "1stpersonebonysword.nif", "ebonygreatsword.nif", "1stpersonebonygreatsword.nif",
+                 "ebonywaraxe.nif", "1stpersonebonywaraxe.nif", "ebonybattleaxe.nif", "1stpersonebonybattleaxe.nif",
+                 "ebonydagger.nif", "1stpersonebonydagger.nif", "ebonyshield.nif"]
 # light through the mesh, gated on the arrow files as on the Ebony replacer (owner 2026-11-14 07:15: light through the
 # nocked arrow); the mace and warhammer are measured and reported
-SEE_THROUGH_MAX, SEE_THROUGH_GATED = 0.004, {"Arrow.nif", "ArrowProjectile.nif"}
+SEE_THROUGH_MAX, SEE_THROUGH_GATED = 0.004, {"Arrow.nif", "ArrowProjectile.nif", "Bow.nif"}
 # atlas -> (LoY file, the shape whose shader and texture set the built shape takes)
-LOY_SHADER = {"axe1h": ("Axe.nif", "Axe2"), "axe2h": ("BattleAxe.nif", "BattleAxe2"), "dagger": ("Dagger.nif", "Scb")}
+LOY_SHADER = {"axe1h": ("Axe.nif", "Axe2"), "axe2h": ("BattleAxe.nif", "BattleAxe2"), "dagger": ("Dagger.nif", "Scb"),
+              "sword1h": ("Sword.nif", "Blade2")}
 
 
 def fail(msg):
@@ -119,7 +135,7 @@ def loy_weapons(work):
     if not arc:
         fail("no 'Main Archive SE-109963' in %s - download Legacy of Ysgramor's main file from Nexus first" % dl)
     tmp = os.path.join(work, "loy_x"); out = os.path.join(work, "loy"); os.makedirs(out, exist_ok=True)
-    for name in sorted({it["loy"] for it in ITEMS.values()} | {f for it in ITEMS.values() for f in it.get("extra_loy", {}).values()}):
+    for name in sorted({it["loy"] for it in ITEMS.values()} | {f for it in ITEMS.values() for f in it.get("extra_loy", {}).values()} | set(EBONY_LOY)):
         p = subprocess.run([sevenzip(), "x", "-y", "-o" + tmp, os.path.join(dl, arc[-1]), "-ir!*Companions\\Weapons\\" + name],
                            capture_output=True, text=True)
         if p.returncode != 0:
@@ -134,7 +150,7 @@ def loy_weapons(work):
 
 def vanilla_meshes(work):
     import bsa
-    data = game_data(); want = ["meshes\\weapons\\ebony\\" + v for it in ITEMS.values() for v, _ in it["outputs"].values()]; got = {}
+    data = game_data(); want = sorted({"meshes\\weapons\\ebony\\" + v for it in ITEMS.values() for v, _ in it["outputs"].values()} | {"meshes\\weapons\\ebony\\" + v for v in EBONY_VANILLA}); got = {}
     for name in ("Skyrim - Meshes0.bsa", "Skyrim - Meshes1.bsa"):
         p = os.path.join(data, name)
         if not os.path.isfile(p):
@@ -152,8 +168,39 @@ def vanilla_meshes(work):
     return root
 
 
+def ebony_stage(loy, van, work):
+    """the Ebony replacer's Blender stage, unchanged, on Legacy of Ysgramor's ebony weapons: its shapes folder"""
+    eb_loy = os.path.join(work, "eb_loy"); d = os.path.join(eb_loy, "weapons", "ebony"); os.makedirs(d, exist_ok=True)
+    for src, dst in EBONY_LOY.items(): shutil.copy2(os.path.join(loy, src), os.path.join(d, dst))
+    eb_van = os.path.join(work, "eb_van"); d = os.path.join(eb_van, "meshes", "weapons", "ebony"); os.makedirs(d, exist_ok=True)
+    for v in EBONY_VANILLA: shutil.copy2(os.path.join(van, v), os.path.join(d, v))
+    bw = os.path.join(work, "blender_ebony"); ep = os.path.join(MW, "ebony_pipeline")
+    env = dict(os.environ, NEAW_LOY_MESHES=eb_loy, NEAW_VANILLA=eb_van, NEAW_WORK=bw)
+    log = os.path.join(work, "blender_ebony.log")
+    with open(log, "w", encoding="utf-8") as lf:
+        r = subprocess.run([blender(), "--background", "--factory-startup", "--python-exit-code", "1", "--python",
+                            os.path.join(ep, "build_stage.py"), "--", "ext=5.0", "art", "chamfer=0.8"], env=env, stdout=lf, stderr=subprocess.STDOUT, cwd=ep)
+    if r.returncode != 0:
+        fail("the Ebony pipeline's Blender stage failed (log %s):\n%s" % (log, open(log, encoding="utf-8", errors="replace").read()[-3000:]))
+    return os.path.join(bw, "shapes"), json.load(open(os.path.join(bw, "stage_report.json")))
+
+
 def build_item(item, spec, loy, van, work, out_dir):
     import assemble, verify
+    if spec.get("kind") == "bow":
+        import assemble_bow, niflib
+        assemble.LOY_SHADER = LOY_SHADER
+        shapes, stage = ebony_stage(loy, van, work)
+        (out_name, (van_name, ours)), = list(spec["outputs"].items())
+        rep = {"stage": {"bow": stage.get("bow"), "bow_vanilla_split_verts": stage.get("bow_vanilla_split_verts")},
+               "assemble": {out_name: assemble_bow.build_bow(os.path.join(van, van_name), os.path.join(out_dir, out_name), shapes, loy)}, "verify": {}}
+        v = verify.check(os.path.join(out_dir, out_name), os.path.join(van, van_name), set(ours))
+        if v["see_through_share"] is None or v["see_through_share"] > SEE_THROUGH_MAX:
+            v["faults"].append(("light through the mesh: rays meet a back face first and no front face after", v["see_through_share"]))
+        bf, br = verify.bow_checks(niflib.Nif(os.path.join(out_dir, out_name)), niflib.Nif(os.path.join(van, van_name)))
+        v["bow"] = br; v["faults"] += bf
+        rep["verify"][out_name] = v
+        return rep, len(v["faults"])
     bw = os.path.join(work, "blender_" + item)
     first3 = [v for v, _ in spec["outputs"].values() if not v.startswith("1stperson")][0]
     env = dict(os.environ, NSAW_WORK=bw, **{spec["env"]: os.path.join(loy, spec["loy"]), spec["van_env"]: os.path.join(van, first3)})

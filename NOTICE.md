@@ -37,7 +37,9 @@ names both authors and links back to both pages.
 The Skyforge Steel Mace (and the weapon types that follow it) is assembled at build time by
 `tools/build-missing-weapons.py` from pieces of NordwarUA's steel war axe in the same Legacy of Ysgramor download,
 each piece keeping its own texture; the node tree, blood shapes and collision it is built on come from the game's own
-ebony mace in the player's Skyrim - Meshes BSA. The repository carries none of these files.
+ebony mace in the player's Skyrim - Meshes BSA. The bow is built by the Nordic Ebony replacer's own pipeline from NordwarUA's ebony
+Wolf weapons in the same download (the same sword mesh as the steel one), then textured with this mod's steel textures.
+The repository carries none of these files.
 
 ## What IS ours
 
