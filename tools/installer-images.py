@@ -21,9 +21,10 @@ SHOTS = {
     "w_waraxe": (["00 Core/meshes/NordicSkyforge/weapons/Axe.nif"], 0), "w_battleaxe": (["00 Core/meshes/NordicSkyforge/weapons/BattleAxe.nif"], 0),
     "w_dagger": (["00 Core/meshes/NordicSkyforge/weapons/Dagger.nif"], 0), "w_mace": (["00 Core/meshes/NordicSkyforge/weapons/Mace.nif"], 0),
     "w_shield": (["00 Core/meshes/NordicSkyforge/weapons/ShieldSteel.nif"], 0),
+    "w_warhammer": (["00 Core/meshes/NordicSkyforge/weapons/Warhammer.nif"], 0), "w_bow": (["00 Core/meshes/NordicSkyforge/weapons/Bow.nif"], 0),
+    # the arrow's model carries the quiver and its six arrows: the header shows them together
+    "w_arrows": (["00 Core/meshes/NordicSkyforge/weapons/Arrow.nif"], 0),
 }
-# weapon types not built yet are left out of the header until their mesh is in the package
-OPTIONAL = {"w_warhammer": (["00 Core/meshes/NordicSkyforge/weapons/Warhammer.nif"], 0)}
 
 BLENDER_SCRIPT = r'''
 import bpy, os, sys, json, math, addon_utils
@@ -33,7 +34,20 @@ from io_scene_nifly.pyn.pynifly import NifFile
 job = json.load(open(sys.argv[sys.argv.index("--") + 1]))
 sc = bpy.context.scene; sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"; sc.cycles.samples = 48; sc.cycles.use_denoising = True
 sc.view_settings.view_transform = "Standard"; sc.render.film_transparent = True
-w = bpy.data.worlds.new("w"); sc.world = w; w.use_nodes = True; w.node_tree.nodes["Background"].inputs["Color"].default_value = (0.35, 0.36, 0.38, 1)
+w = bpy.data.worlds.new("w"); sc.world = w; w.use_nodes = True; bg = w.node_tree.nodes["Background"]; bg.inputs["Color"].default_value = (0.35, 0.36, 0.38, 1)
+# GAME-LIKE LIGHTING (the owner, 2026-11-15 07:26, on steel rendered black): Skyrim keeps a weapon's diffuse and ADDS an
+# environment reflection where the _m mask allows. A metallic material under a flat grey world has nothing to mirror and
+# draws steel near-black. So: no metallic, specular strength from the _m mask, and reflections see a sky-to-ground
+# gradient (the camera still sees the plain backdrop). The same shading as the review sheets' render_compare.py.
+nt_ = w.node_tree; tc = nt_.nodes.new("ShaderNodeTexCoord"); sep = nt_.nodes.new("ShaderNodeSeparateXYZ")
+ramp = nt_.nodes.new("ShaderNodeValToRGB"); ramp.color_ramp.elements[0].position = 0.35; ramp.color_ramp.elements[0].color = (0.10, 0.10, 0.11, 1)
+ramp.color_ramp.elements[1].position = 0.75; ramp.color_ramp.elements[1].color = (1.0, 1.0, 1.02, 1)
+mapr = nt_.nodes.new("ShaderNodeMapRange"); mapr.inputs["From Min"].default_value = -1.0; mapr.inputs["From Max"].default_value = 1.0
+nt_.links.new(tc.outputs["Generated"], sep.inputs[0]); nt_.links.new(sep.outputs["Z"], mapr.inputs["Value"]); nt_.links.new(mapr.outputs["Result"], ramp.inputs["Fac"])
+bg2 = nt_.nodes.new("ShaderNodeBackground"); nt_.links.new(ramp.outputs["Color"], bg2.inputs["Color"]); bg2.inputs["Strength"].default_value = 1.3
+lp = nt_.nodes.new("ShaderNodeLightPath"); mx = nt_.nodes.new("ShaderNodeMixShader")
+nt_.links.new(lp.outputs["Is Camera Ray"], mx.inputs["Fac"]); nt_.links.new(bg2.outputs[0], mx.inputs[1]); nt_.links.new(bg.outputs[0], mx.inputs[2])
+nt_.links.new(mx.outputs[0], nt_.nodes["World Output"].inputs["Surface"])
 mats = {}
 def material(d):
     if d in mats: return mats[d]
@@ -41,7 +55,18 @@ def material(d):
     p = os.path.join(job["tex"], d.replace("\\", os.sep))
     if os.path.isfile(p):
         t = nt.nodes.new("ShaderNodeTexImage"); t.image = bpy.data.images.load(p, check_existing=True); nt.links.new(t.outputs["Color"], b.inputs["Base Color"])
-    b.inputs["Metallic"].default_value = 0.55; b.inputs["Roughness"].default_value = 0.42
+    pn = p[:-4] + "_n.dds"
+    if os.path.isfile(pn):
+        tn = nt.nodes.new("ShaderNodeTexImage"); tn.image = bpy.data.images.load(pn, check_existing=True); tn.image.colorspace_settings.name = "Non-Color"
+        nm = nt.nodes.new("ShaderNodeNormalMap"); nt.links.new(tn.outputs["Color"], nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
+    b.inputs["Metallic"].default_value = 0.0
+    pm = p[:-4] + "_m.dds"
+    if os.path.isfile(pm):
+        tm = nt.nodes.new("ShaderNodeTexImage"); tm.image = bpy.data.images.load(pm, check_existing=True); tm.image.colorspace_settings.name = "Non-Color"
+        sm = nt.nodes.new("ShaderNodeMath"); sm.operation = "MULTIPLY_ADD"; sm.inputs[1].default_value = 0.9; sm.inputs[2].default_value = 0.3
+        nt.links.new(tm.outputs["Color"], sm.inputs[0]); nt.links.new(sm.outputs[0], b.inputs["Specular IOR Level"]); b.inputs["Roughness"].default_value = 0.3
+    else:
+        b.inputs["Roughness"].default_value = 0.5
     mats[d] = m; return m
 for name, (paths, yaw) in job["shots"].items():
     for o in list(bpy.data.objects): bpy.data.objects.remove(o)
@@ -56,7 +81,7 @@ for name, (paths, yaw) in job["shots"].items():
         for o in [o for o in bpy.data.objects if o not in before]:
             if o.type != "MESH": continue
             nm = o.name if o.name in tex else o.name.split(".")[0]; d = tex.get(nm, "")
-            if "blood" in (nm + d).lower() or not d.lower().startswith("textures\\nordicskyforge"): o.hide_render = True; continue
+            if "blood" in (nm + d).lower() or nm == "Scb" or not d.lower().startswith("textures\\nordicskyforge"): o.hide_render = True; continue
             o.data.materials.clear(); o.data.materials.append(material(d)); objs.append(o)
     for L, rot, e in (("key", (math.radians(40), math.radians(-35), 0), 3.0), ("rim", (math.radians(-55), math.radians(145), 0), 2.0), ("fill", (math.radians(60), math.radians(160), 0), 1.0)):
         l = bpy.data.lights.new(L, "SUN"); l.energy = e; lo = bpy.data.objects.new(L, l); lo.rotation_euler = rot; sc.collection.objects.link(lo)
@@ -93,8 +118,6 @@ def main(pkg):
     from PIL import Image, ImageDraw
     work = os.path.join(pkg, "_images_work"); os.makedirs(work, exist_ok=True)
     shots = {k: ([os.path.join(pkg, p) for p in ps], yaw) for k, (ps, yaw) in SHOTS.items()}
-    for k, (ps, yaw) in OPTIONAL.items():
-        if all(os.path.isfile(os.path.join(pkg, p)) for p in ps): shots[k] = ([os.path.join(pkg, p) for p in ps], yaw)
     for k, (ps, _) in shots.items():
         for p in ps:
             if not os.path.isfile(p): raise SystemExit("installer-images: the package has no %s" % p)
@@ -107,14 +130,16 @@ def main(pkg):
     os.makedirs(IMG, exist_ok=True)
     bg = (38, 39, 42)
     def card(name, size):
-        im = Image.open(os.path.join(work, name + ".png")).convert("RGBA"); box = im.getbbox(); im = im.crop(box) if box else im
+        im = Image.open(os.path.join(work, name + ".png")).convert("RGBA")
+        if name == "w_arrows": im = im.rotate(180)     # the quiver model runs mouth-down along y: shown as it hangs, arrows up
+        box = im.getbbox(); im = im.crop(box) if box else im
         im.thumbnail(size); c = Image.new("RGB", size, bg); c.paste(im, ((size[0] - im.width) // 2, (size[1] - im.height) // 2), im); return c
     for name in ("himbo", "cbbe3ba"):
         card(name, (800, 1000)).save(os.path.join(IMG, name + ".png"))
-    # header: the armour and the twelve pieces in a row
-    order = [k for k in ["outfit", "w_sword", "w_greatsword", "w_waraxe", "w_battleaxe", "w_dagger", "w_shield", "w_mace", "w_warhammer"] if k in shots]
+    # header: the armour and every weapon in a row (the bow and the quiver of arrows included)
+    order = ["outfit", "w_sword", "w_greatsword", "w_waraxe", "w_battleaxe", "w_dagger", "w_mace", "w_warhammer", "w_bow", "w_arrows", "w_shield"]
     H = 520; head = Image.new("RGB", (1800, H + 60), bg); x = 10
-    widths = {k: (260 if k == "outfit" else 230 if k == "w_shield" else 140) for k in order}
+    widths = {k: (260 if k == "outfit" else 230 if k == "w_shield" else 170 if k == "w_bow" else 150 if k == "w_arrows" else 140) for k in order}
     scale = (1780 - 10 * (len(order) - 1)) / sum(widths.values())
     for k in order:
         w = int(widths[k] * scale); head.paste(card(k, (w, H)), (x, 10)); x += w + 10
