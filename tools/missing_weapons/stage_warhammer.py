@@ -61,7 +61,7 @@ for i in range(26):
 # shaped currently, but it should be the rounded shape with the same design work equivalent"). The steel axes have no
 # paw cap, so the round barrel takes the SHAPE of the Ebony hammer's - Legacy of Ysgramor's ebony battle axe paw cap
 # (battleaxe_26), placed exactly as the Ebony recipe places it - and is re-surfaced from scratch on the steel atlas: the
-# serpent knot chain engraved across the steel head plate wrapped round it in three rows (the Ebony gold braid's place).
+# rune band engraved on the steel battle axe's haft wrapped round it in two rows, as the Ebony head carries its handle's braid.
 EB = load_parts(os.environ["NSAW_BAXE_EBONY"], "ebaxe")
 paw = EB["ebaxe_26"]; plo, phi = obb(paw)
 assert max(abs(plo[i] - v) for i, v in enumerate((-3.65, -49.0, -2.77))) < 0.02 and \
@@ -113,7 +113,11 @@ FU0, FV0, FUW = 1392 / 2048, 1 - 440 / 2048, 72 / 2048              # the blade'
 XF = XC - EXT
 
 # ---- the surface: zones along the hammer (a = distance from the socket end), each on its own atlas window
-CHAIN = (620, 1060, 522, 618)    # atlas px x0, x1, y0, y1: the serpent knot chain engraved across the steel head plate
+# the owner, 2026-11-15 15:11: "wrap the added hammerhead with the Nordic text that's on the handle, since the ebony piece has
+# what's on its handle wrapped around it" - the haft's rune band (the strip that reads the right way round; the one above
+# it is its mirror), once round the drum per row, never mirrored so the runes read
+RUNES = (690, 1400, 1797, 1903)  # atlas px x0, x1, y0, y1: the engraved rune band on the battle axe haft
+RSIGN = 1                        # which way round the runes run (checked on the render: they must read, not mirror)
 PLAIN = (1364, 1420, 388, 444)   # plain head-plate steel beside the face window (lowest texture + normal variation, 64 px scan)
 RING = (0.7759, 0.9756, 0.9544, 0.9721)                              # the steel collar ring's own strip (u0, u1, v0, v1)
 def px(x, y): return (x / 2048, 1 - y / 2048)
@@ -123,14 +127,14 @@ def frac_of(p, turn=0.0): return ((ang(p) + math.pi) / (2 * math.pi) + turn) % 1
 A0 = min(HX - v.co.x for v in ham.data.vertices)                    # where the barrel starts, socket end
 AL = HX - (XF + CH)                                                  # where the lip starts
 MARG = 0.45
-NROW = 3                         # three rows: each near the chain's own proportions (2 mirrored repeats round the drum)
+NROW = 2                         # two rows: one rune band round the drum is close to the band's own proportions
 HROW = (AL - A0 - 2 * MARG) / NROW
 CUTS = [A0 + MARG + k * HROW for k in range(NROW + 1)]               # zone boundaries (geometry is cut there)
 def zone(a):
     if a > AL + 1e-4: return "lip"
     if a < CUTS[0] or a > CUTS[-1]: return "plain"
     return "row%d" % min(int((a - CUTS[0]) / HROW), NROW - 1)
-def uv_at(p, z, flat=False):
+def uv_at(p, z, flat=False, fr=None):
     a = HX - p.x
     if flat:   # a face square to the axis (a step or end ring): its depth along the zone runs with the radius instead
         r = math.hypot(p.y - CY, p.z - CZ); a = A0 + (r / RAD) * (AL - A0) if z == "plain" else a
@@ -141,8 +145,9 @@ def uv_at(p, z, flat=False):
         s = tri(4 * frac_of(p)); t = min(max(a - A0, 0) / max(AL - A0, 1e-3), 1)
         return px(PLAIN[0] + s * (PLAIN[1] - PLAIN[0]), PLAIN[2] + t * (PLAIN[3] - PLAIN[2]))
     k = int(z[3:])
-    s = tri(2 * frac_of(p, 0.25 * k)); t = min(max((a - CUTS[k]) / HROW, 0), 1)
-    return px(CHAIN[0] + s * (CHAIN[1] - CHAIN[0]), CHAIN[2] + t * (CHAIN[3] - CHAIN[2]))
+    s = fr if fr is not None else rune_frac(p, k); t = min(max((a - CUTS[k]) / HROW, 0), 1)
+    return px(RUNES[0] + s * (RUNES[1] - RUNES[0]), RUNES[2] + t * (RUNES[3] - RUNES[2]))
+def rune_frac(p, k): return (RSIGN * frac_of(p) + 0.5 * k) % 1.0     # the second row turned half round: seams apart
 def surface(o):
     """cut the mesh at every zone boundary, then give each face the UVs of its zone (no face spans two windows)"""
     bm = bmesh.new(); bm.from_mesh(o.data)
@@ -154,10 +159,14 @@ def surface(o):
         f.normal_update(); flat = abs(f.normal.x) > 0.7
         z = "plain" if flat and zone(HX - f.calc_center_median().x) != "lip" else zone(HX - f.calc_center_median().x)
         count[z] = count.get(z, 0) + 1
-        for l in f.loops:
-            l[uvl].uv = uv_at(l.vert.co, z, flat)
+        frs = [None] * len(f.loops)
+        if z.startswith("row"):    # one band round, not mirrored: a face across the band's seam keeps its corners together
+            frs = [rune_frac(l.vert.co, int(z[3:])) for l in f.loops]
+            if max(frs) - min(frs) > 0.5: frs = [x + 1.0 if x < 0.5 else x for x in frs]
+        for l, fr in zip(f.loops, frs):
+            l[uvl].uv = uv_at(l.vert.co, z, flat, fr)
     bm.to_mesh(o.data); bm.free(); count["hard_edges_split"] = harden(o); return count
-REP["surface"] = {"chain_px": CHAIN, "plain_px": PLAIN, "ring_uv": RING, "a0": round(A0, 3), "lip_a": round(AL, 3),
+REP["surface"] = {"runes_px": RUNES, "plain_px": PLAIN, "ring_uv": RING, "a0": round(A0, 3), "lip_a": round(AL, 3),
                   "row_h": round(HROW, 3), "barrel_faces_by_zone": surface(ham)}
 
 fb = bmesh.new(); uvl = fb.loops.layers.uv.new("UVMap")
@@ -227,7 +236,7 @@ bmesh.ops.remove_doubles(eb_, verts=eb_.verts[:], dist=1e-5)
 xme = bpy.data.meshes.new("wh_ext"); eb_.to_mesh(xme); eb_.free(); xme.uv_layers.new(name="UVMap")
 ext = bpy.data.objects.new("wh_ext", xme); bpy.context.scene.collection.objects.link(ext); ext["tex"] = "axe2h"; ext["src"] = "new"
 REP["surface"]["ext_faces_by_zone"] = surface(ext)
-add(ext, "new", "a %.2f round extension continuing the barrel's knot rows, and a 45-degree lip on the steel collar ring's own strip" % EXT)
+add(ext, "new", "a %.2f round extension continuing the barrel's rune rows, and a 45-degree lip on the steel collar ring's own strip" % EXT)
 bmesh.ops.remove_doubles(fb, verts=fb.verts[:], dist=1e-5)
 fme = bpy.data.meshes.new("wh_face"); fb.to_mesh(fme); fb.free()
 face = bpy.data.objects.new("wh_face", fme); bpy.context.scene.collection.objects.link(face)
