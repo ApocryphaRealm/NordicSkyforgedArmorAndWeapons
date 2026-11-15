@@ -171,6 +171,15 @@ def main(out_root=None, test=False):
         open(d, "wb").write(new)
         shipped.append(d)
 
+    # ---- the shield to the Truly Nordic Carved "Shield - Clean" face size (the owner, 2026-11-15, as on the Nordic Ebony
+    # replacer): scaled about its grip in place. Legacy of Ysgramor's steel shield is the same mesh as its ebony one, so
+    # the Ebony replacer's tools\missing_weapons\shield_size.py is used unchanged.
+    sys.path.insert(0, os.path.join(HERE, "missing_weapons"))
+    import shield_size
+    sh = shield_size.resize(os.path.join(core, "meshes", "NordicSkyforge", "weapons", "ShieldSteel.nif"))
+    print("  shield ................ rim %.2f -> %.2f (x%.4f about %s)" % (
+        sh["rim_diameter_before"], sh["rim_diameter_after"], sh["scale"], sh["pivot"]))
+
     # ---- the new weapon types' meshes, built from Legacy of Ysgramor's pieces by tools/build-missing-weapons.py
     built_list = os.path.join(REPO, "plugin", "meshes-built.txt")
     built_wanted = [l.strip() for l in open(built_list, encoding="utf-8") if l.strip()] if os.path.isfile(built_list) else []
