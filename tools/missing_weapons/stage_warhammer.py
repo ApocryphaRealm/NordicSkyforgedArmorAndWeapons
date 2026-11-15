@@ -57,11 +57,17 @@ for i in range(26):
         keep_faces(o, lambda c: c.x > -1.3 + DX or (c.y > 49.0 and c.x > -2.6 + DX))   # head plate minus the bit
     add(o, pid, "battle axe kept: haft, grip, butt, socket, top spike, back fang" if i == 0 else None)
 
-# the hammer: the steel butt (studded cuff + moulded end cap) turned forward as the Ebony paw cap was
-ham_parts = [dup(P["battleaxe_24"], "wh_hammer_cuff"), dup(P["battleaxe_25"], "wh_hammer_end")]
-blo = Vector((min(obb(o)[0][i] for o in ham_parts) for i in range(3))); bhi = Vector((max(obb(o)[1][i] for o in ham_parts) for i in range(3)))
-c = Vector(((blo.x + bhi.x) / 2, bhi.y, (blo.z + bhi.z) / 2))
-ham = join(ham_parts, "wh_hammer"); ham["tex"] = "axe2h"; ham["src"] = "battleaxe_24+25"
+# the hammer (owner 2026-11-15: "the Warhammer doesn't match the Ebony version, because the Skyforged version is square
+# shaped currently, but it should be the rounded shape with the same design work equivalent"). The steel axes have no
+# paw cap, so the round barrel takes the SHAPE of the Ebony hammer's - Legacy of Ysgramor's ebony battle axe paw cap
+# (battleaxe_26), placed exactly as the Ebony recipe places it - and is re-surfaced from scratch on the steel atlas: the
+# serpent knot chain engraved across the steel head plate wrapped round it in three rows (the Ebony gold braid's place).
+EB = load_parts(os.environ["NSAW_BAXE_EBONY"], "ebaxe")
+paw = EB["ebaxe_26"]; plo, phi = obb(paw)
+assert max(abs(plo[i] - v) for i, v in enumerate((-3.65, -49.0, -2.77))) < 0.02 and \
+       max(abs(phi[i] - v) for i, v in enumerate((2.44, -42.36, 1.56))) < 0.02, ("not the ebony paw cap", plo, phi)
+ham = dup(paw, "wh_hammer"); ham["tex"] = "axe2h"; ham["src"] = "ebony battleaxe_26, shape only"
+c = Vector((-0.6, -42.36, -0.6))                                     # the Ebony recipe's own pivot on the paw
 xform(ham, T(HX, CY, CZ) @ R(-90, "Z") @ S(1.75) @ T(-c.x, -c.y, -c.z))
 
 def profile(o):
@@ -71,35 +77,23 @@ def profile(o):
     front = {k: r for k, r in bins.items() if k < (xmin + xmax) / 2}
     xc = max(front, key=lambda k: front[k]); return xc, front[xc], bins
 R_EBONY = 5.340781689697771                 # the Ebony face's radius (its round3\face_ext_art_ch.json)
-_, r175, _ = profile(ham)
-HS = 1.75 * R_EBONY / r175                  # the scale that gives the Ebony face's radius
-xform(ham, T(HX, CY, CZ) @ S(HS / 1.75) @ T(-HX, -CY, -CZ))
-XC, _, bins = profile(ham)
-REP["hammer"] = {"scale": round(HS, 4), "cut_x": XC, "profile": sorted((k, round(r, 2)) for k, r in bins.items())}
-add(ham, "battleaxe_24+25", "the steel butt (studded cuff + moulded end cap) turned to face forward, x%.3f (the Ebony face's radius) - the hammer" % HS)
-
-# the rows of the end cap the extension continues: per angle, the cut row's UV (read off the cut below) and the UV of
-# the cap's frontmost point at that angle (its rim) - sampled BEFORE the cut takes the front away
+XC, r_cut, bins = profile(ham)
+REP["hammer"] = {"shape": "ebony paw cap x1.75 (the Ebony recipe)", "cut_x": XC, "cut_r": round(r_cut, 3),
+                 "profile": sorted((k, round(r, 2)) for k, r in bins.items())}
+assert abs(r_cut - R_EBONY) < 0.15, ("the cut radius is not the Ebony face's", r_cut)
+add(ham, "ebony battleaxe_26", "a round barrel in the shape of the Ebony hammer's (the ebony paw cap x1.75, placed as the Ebony recipe places it), "
+    "surfaced from scratch on the steel atlas")
 def ang(p): return math.atan2(p.z - CZ, -(p.y - CY))
-me = ham.data; uvd = me.uv_layers.active.data
-front_uv = {}
-for l in me.loops:
-    p = me.vertices[l.vertex_index].co
-    if math.hypot(p.y - CY, p.z - CZ) < 0.5: continue
-    k = int((ang(p) + math.pi) / (2 * math.pi) * 48) % 48
-    if k not in front_uv or p.x < front_uv[k][0]: front_uv[k] = (p.x, tuple(uvd[l.index].uv))
 
 # the cut: flat at the widest front section (Ebony round 3)
 bm = bmesh.new(); bm.from_mesh(ham.data)
 bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(XC, 0, 0), plane_no=(-1, 0, 0), clear_outer=True)
 bm.to_mesh(ham.data); bm.free()
-bnd, cut_uv = [], []
-bm = bmesh.new(); bm.from_mesh(ham.data); uvl0 = bm.loops.layers.uv.active
+bnd = []
+bm = bmesh.new(); bm.from_mesh(ham.data)
 for e in bm.edges:
     if len(e.link_faces) == 1 and all(abs(v.co.x - XC) < 1e-3 for v in e.verts):
         bnd.append((e.verts[0].co.copy(), e.verts[1].co.copy()))
-        for v in e.verts:
-            for l in v.link_loops: cut_uv.append((ang(v.co), tuple(l[uvl0].uv)))
 bm.free()
 RAD = max(math.hypot(p.y - CY, p.z - CZ) for e in bnd for p in e)
 
@@ -112,36 +106,59 @@ xform(rg, T(RX, CY, CZ) @ R(-90, "Z") @ S(rk) @ T(-rc.x, -rc.y, -rc.z))
 add(rg, "battleaxe_21", "the steel collar ring (x%.3f, 8%% proud of the hammer) where the hammer meets the socket" % rk)
 
 # ---------------------------------------------------------------- round 3: extension, 45-degree lip, gnarled face
-# the Ebony extension is 5.0; scaled to the Ebony face radius the steel butt reaches further than the paw did, so the
-# extension is shortened by that much to keep the Ebony hammer's reach (socket end to face)
 E_REACH = (-7.25 - 5.0) - (-1.1)            # the Ebony face plane relative to its hammer's socket end (round3 face json)
 PITCH, HT, NSEG, CH = 0.62, 0.31, 96, 0.8
 EXT = max(2.0, (XC - HX) - E_REACH)
 FU0, FV0, FUW = 1392 / 2048, 1 - 440 / 2048, 72 / 2048              # the blade's flat-normal steel (re-measured on axe2h)
+XF = XC - EXT
 
-# the band's u round the circle, from the cut's own UVs: u = U_LO + frac((s * a - a0) / 2pi) * (U_HI - U_LO)
-us = [uv[0] for a, uv in cut_uv]; U_LO, U_HI = min(us), max(us)
-best = None
-for s in (1, -1):
-    for i in range(360):
-        a0 = 2 * math.pi * i / 360
-        err = sum((U_LO + (((s * a - a0) / (2 * math.pi)) % 1.0) * (U_HI - U_LO) - uv[0]) ** 2 for a, uv in cut_uv)
-        if best is None or err < best[0]: best = (err, s, a0)
-_, SGN, A0 = best
-REP["band_u_fit"] = {"u": [round(U_LO, 4), round(U_HI, 4)], "sign": SGN, "seam_deg": round(math.degrees(A0), 1),
-                     "rms": round(math.sqrt(best[0] / len(cut_uv)), 4)}
-def frac(a): return ((SGN * a - A0) / (2 * math.pi)) % 1.0
-def nearest_v(samples, a):
-    return min(samples, key=lambda t: abs(math.atan2(math.sin(t[0] - a), math.cos(t[0] - a))))[1]
-cut_v = [(a, uv[1]) for a, uv in cut_uv]
-# the rim rows, median-filtered over 5 neighbouring angles (the end cap is lobed: its frontmost point jumps between lobes)
-_rv = {k: uv[1] for k, (x, uv) in front_uv.items()}
-rim_v = [(-math.pi + (k + 0.5) / 48 * 2 * math.pi, sorted(_rv[(k + d) % 48] for d in range(-2, 3) if (k + d) % 48 in _rv)[2 if all((k + d) % 48 in _rv for d in range(-2, 3)) else 0])
-         for k in _rv]
-# draft 1 (2026-11-15) ran the band 0.92 of the way to the rim and the lip just inside it: both landed in the island's
-# lobes and its stretched padding (streaks). The drum takes the moulding's first half from the cut, the lip the row
-# just past it (the ridge), clear of the lobes.
-DRUM_SPAN, LIP_ROWS = 0.50, (0.50, 0.56)
+# ---- the surface: zones along the hammer (a = distance from the socket end), each on its own atlas window
+CHAIN = (620, 1060, 522, 618)    # atlas px x0, x1, y0, y1: the serpent knot chain engraved across the steel head plate
+PLAIN = (1364, 1420, 388, 444)   # plain head-plate steel beside the face window (lowest texture + normal variation, 64 px scan)
+RING = (0.7759, 0.9756, 0.9544, 0.9721)                              # the steel collar ring's own strip (u0, u1, v0, v1)
+def px(x, y): return (x / 2048, 1 - y / 2048)
+def tri(t):
+    t = t % 2.0; return t if t <= 1 else 2 - t
+def frac_of(p, turn=0.0): return ((ang(p) + math.pi) / (2 * math.pi) + turn) % 1.0
+A0 = min(HX - v.co.x for v in ham.data.vertices)                    # where the barrel starts, socket end
+AL = HX - (XF + CH)                                                  # where the lip starts
+MARG = 0.45
+NROW = 3                         # three rows: each near the chain's own proportions (2 mirrored repeats round the drum)
+HROW = (AL - A0 - 2 * MARG) / NROW
+CUTS = [A0 + MARG + k * HROW for k in range(NROW + 1)]               # zone boundaries (geometry is cut there)
+def zone(a):
+    if a > AL + 1e-4: return "lip"
+    if a < CUTS[0] or a > CUTS[-1]: return "plain"
+    return "row%d" % min(int((a - CUTS[0]) / HROW), NROW - 1)
+def uv_at(p, z, flat=False):
+    a = HX - p.x
+    if flat:   # a face square to the axis (a step or end ring): its depth along the zone runs with the radius instead
+        r = math.hypot(p.y - CY, p.z - CZ); a = A0 + (r / RAD) * (AL - A0) if z == "plain" else a
+    if z == "lip":
+        f = frac_of(p); t = min(max((a - AL) / CH, 0), 1)
+        return (RING[0] + f * (RING[1] - RING[0]), RING[3] - t * (RING[3] - RING[2]))
+    if z == "plain":
+        s = tri(4 * frac_of(p)); t = min(max(a - A0, 0) / max(AL - A0, 1e-3), 1)
+        return px(PLAIN[0] + s * (PLAIN[1] - PLAIN[0]), PLAIN[2] + t * (PLAIN[3] - PLAIN[2]))
+    k = int(z[3:])
+    s = tri(2 * frac_of(p, 0.25 * k)); t = min(max((a - CUTS[k]) / HROW, 0), 1)
+    return px(CHAIN[0] + s * (CHAIN[1] - CHAIN[0]), CHAIN[2] + t * (CHAIN[3] - CHAIN[2]))
+def surface(o):
+    """cut the mesh at every zone boundary, then give each face the UVs of its zone (no face spans two windows)"""
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    for a in CUTS + [AL]:
+        bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(HX - a, 0, 0), plane_no=(1, 0, 0))
+    uvl = bm.loops.layers.uv.active or bm.loops.layers.uv.new("UVMap")
+    count = {}
+    for f in bm.faces:
+        f.normal_update(); flat = abs(f.normal.x) > 0.7
+        z = "plain" if flat and zone(HX - f.calc_center_median().x) != "lip" else zone(HX - f.calc_center_median().x)
+        count[z] = count.get(z, 0) + 1
+        for l in f.loops:
+            l[uvl].uv = uv_at(l.vert.co, z, flat)
+    bm.to_mesh(o.data); bm.free(); count["hard_edges_split"] = harden(o); return count
+REP["surface"] = {"chain_px": CHAIN, "plain_px": PLAIN, "ring_uv": RING, "a0": round(A0, 3), "lip_a": round(AL, 3),
+                  "row_h": round(HROW, 3), "barrel_faces_by_zone": surface(ham)}
 
 fb = bmesh.new(); uvl = fb.loops.layers.uv.new("UVMap")
 def uv_of(p): return (FU0 + (p.y - CY + RAD) / (2 * RAD) * FUW, FV0 + (p.z - CZ + RAD) / (2 * RAD) * FUW)
@@ -165,7 +182,6 @@ def clip(poly2):
             if (sp >= 0) != (sq >= 0):
                 t = sp / (sp - sq); out.append(tuple(Pp[k] + (Q[k] - Pp[k]) * t for k in range(3)))
     return out
-XF = XC - EXT
 def W(u, v, h): return Vector((XF - h, CY + u, CZ + v))
 n = int(math.ceil(2 * RF / PITCH)); off = -n * PITCH / 2
 teeth = whole = walls = 0
@@ -194,28 +210,24 @@ for a, b in bnd:                             # skirt: the cut section out to the
     if (to_circle(a) - a).length < 1e-4 and (to_circle(b) - b).length < 1e-4: continue
     poly([a, b, to_circle(b), to_circle(a)] if (to_circle(b) - b).length > 1e-4 and (to_circle(a) - a).length > 1e-4 else
          ([a, b, to_circle(b)] if (to_circle(b) - b).length > 1e-4 else [a, b, to_circle(a)]), Vector((-1, 0, 0)))
-# the extension (a drum of radius R from the cut to the lip) and the 45-degree lip, on the end cap's own band
-bands = [(XC, RAD, XF + CH, RAD), (XF + CH, RAD, XF, RAD - CH)]
-for (xa, ra, xb, rb), i in [(b, i) for b in bands for i in range(NSEG)]:
-    a0, a1 = 2 * math.pi * i / NSEG, 2 * math.pi * (i + 1) / NSEG
-    Pq = [Vector((xa, CY + ra * math.cos(a0), CZ + ra * math.sin(a0))), Vector((xa, CY + ra * math.cos(a1), CZ + ra * math.sin(a1))),
-          Vector((xb, CY + rb * math.cos(a1), CZ + rb * math.sin(a1))), Vector((xb, CY + rb * math.cos(a0), CZ + rb * math.sin(a0)))]
-    vv = [fb.verts.new(q) for q in Pq]; f = fb.faces.new(vv); f.normal_update()
-    mid = Vector((0, math.cos((a0 + a1) / 2), math.sin((a0 + a1) / 2)))
-    if f.normal.dot(mid) < 0: f.normal_flip()
-    f.smooth = True
-    angs = [ang(l.vert.co) for l in f.loops]; frs = [frac(a) for a in angs]
-    if max(frs) - min(frs) > 0.5:            # a face across the band's seam: its corners on one side, as the Ebony face does
-        low = sum(1 for x in frs if x < 0.5) * 2 >= len(frs)
-        frs = [0.0 if (low and x > 0.5) else (1.0 if (not low and x < 0.5) else x) for x in frs]
-    lip = min(l.vert.co.x for l in f.loops) < XF + CH - 1e-4
-    for l, a, fr in zip(f.loops, angs, frs):
-        vc, vr = nearest_v(cut_v, a), nearest_v(rim_v, a)
-        if lip:   # the lip: a narrow run of rows just inside the end cap's rim (the Ebony lip's gold rows' place)
-            t = (XF + CH - l.vert.co.x) / CH; v = vc + (vr - vc) * (LIP_ROWS[0] + (LIP_ROWS[1] - LIP_ROWS[0]) * t)
-        else:
-            t = (XC - l.vert.co.x) / (EXT - CH); v = vc + (vr - vc) * DRUM_SPAN * t
-        l[uvl].uv = (U_LO + fr * (U_HI - U_LO), v)
+# the extension (a drum of radius RAD from the cut to the lip) and the 45-degree lip: their own object, surfaced by zone
+eb_ = bmesh.new()
+XS = sorted({XC, XF + CH, XF} | {HX - a for a in CUTS if XF + CH < HX - a < XC}, reverse=True)
+def r_of(x): return RAD if x >= XF + CH - 1e-6 else RAD - (XF + CH - x)
+for xa, xb in zip(XS, XS[1:]):
+    for i in range(NSEG):
+        a0, a1 = 2 * math.pi * i / NSEG, 2 * math.pi * (i + 1) / NSEG; ra, rb = r_of(xa), r_of(xb)
+        Pq = [Vector((xa, CY + ra * math.cos(a0), CZ + ra * math.sin(a0))), Vector((xa, CY + ra * math.cos(a1), CZ + ra * math.sin(a1))),
+              Vector((xb, CY + rb * math.cos(a1), CZ + rb * math.sin(a1))), Vector((xb, CY + rb * math.cos(a0), CZ + rb * math.sin(a0)))]
+        vv = [eb_.verts.new(q) for q in Pq]; f = eb_.faces.new(vv); f.normal_update()
+        mid = Vector((0, math.cos((a0 + a1) / 2), math.sin((a0 + a1) / 2)))
+        if f.normal.dot(mid) < 0: f.normal_flip()
+        f.smooth = True
+bmesh.ops.remove_doubles(eb_, verts=eb_.verts[:], dist=1e-5)
+xme = bpy.data.meshes.new("wh_ext"); eb_.to_mesh(xme); eb_.free(); xme.uv_layers.new(name="UVMap")
+ext = bpy.data.objects.new("wh_ext", xme); bpy.context.scene.collection.objects.link(ext); ext["tex"] = "axe2h"; ext["src"] = "new"
+REP["surface"]["ext_faces_by_zone"] = surface(ext)
+add(ext, "new", "a %.2f round extension continuing the barrel's knot rows, and a 45-degree lip on the steel collar ring's own strip" % EXT)
 bmesh.ops.remove_doubles(fb, verts=fb.verts[:], dist=1e-5)
 fme = bpy.data.meshes.new("wh_face"); fb.to_mesh(fme); fb.free()
 face = bpy.data.objects.new("wh_face", fme); bpy.context.scene.collection.objects.link(face)
@@ -236,7 +248,7 @@ for p in fme.polygons:
 REP["face"] = {"cut_x": round(XC, 3), "radius": round(RAD, 4), "teeth": teeth, "whole": whole, "walls": walls, "faces": len(fme.polygons),
                "walls_reprojected": nwall, "hard_edges_split": harden(face), "uv_window_px": [1392, 368, 72], "ext": EXT, "chamfer": CH}
 add(face, "new", "a flat circular striking face from scratch: %d square pyramid teeth (pitch %.2f, height %.2f, 45 deg) clipped to the circle, "
-    "on the blade's flat-normal steel; a %.2f extension and a 45-degree lip on the end cap's own band" % (teeth, PITCH, HT, EXT))
+    "on the blade's flat-normal steel" % (teeth, PITCH, HT))
 json.dump(LOG, open(os.path.join(os.environ["NSAW_WORK"], "provenance_warhammer.json"), "w"), indent=1)
 
 # ---------------------------------------------------------------- game-ready (as the Ebony build_stage.py's warhammer)
@@ -257,4 +269,4 @@ export_single(b, os.path.join(OUTD, "warhammer_blood.nif"))
 REP["blood"] = {"faces": len(b.data.polygons), "uv_box": [list(uvb[0]), list(uvb[1])]}
 lo, hi = obb(wh); REP["bbox"] = [[round(x, 2) for x in lo], [round(x, 2) for x in hi]]; REP["faces"] = len(wh.data.polygons)
 json.dump(REP, open(os.path.join(os.environ["NSAW_WORK"], "stage_report.json"), "w"), indent=1, default=str)
-print("STAGE DONE", json.dumps(REP["face"]), REP["hammer"]["scale"], REP["bbox"])
+print("STAGE DONE", json.dumps(REP["face"]), REP["hammer"]["cut_r"], REP["bbox"])

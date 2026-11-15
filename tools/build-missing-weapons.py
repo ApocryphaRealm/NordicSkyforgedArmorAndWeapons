@@ -52,7 +52,10 @@ ITEMS = {
     "mace": {"stage": "stage_mace.py", "loy": "Axe.nif", "env": "NSAW_AXE", "van_env": "NSAW_VAN_MACE",
              "outputs": {"Mace.nif": ("ebonymace.nif", "EbonyMace:0"),
                          "1stPersonMace.nif": ("1stpersonebonymace.nif", "1stPersonEbonyMace:0")}},
+    # the hammer's round barrel is the shape of Legacy of Ysgramor's EBONY battle axe paw cap (the Ebony replacer's hammer),
+    # re-surfaced on the steel atlas - so the ebony battle axe is read too (owner 2026-11-15: rounded, as the Ebony one)
     "warhammer": {"stage": "stage_warhammer.py", "loy": "BattleAxe.nif", "env": "NSAW_BAXE", "van_env": "NSAW_VAN_WARHAMMER",
+                  "extra_loy": {"NSAW_BAXE_EBONY": "BattleAxeEbony.nif"},
                   "outputs": {"Warhammer.nif": ("ebonywarhammer.nif", "EbonyWarhammer:0"),
                               "1stPersonWarhammer.nif": ("1stpersonebonywarhammer.nif", "1stPersonEbonyWarhammer:0")}},
     # the arrow (with its quiver and six quiver arrows) and the arrow in flight; no first-person file (ammunition has none)
