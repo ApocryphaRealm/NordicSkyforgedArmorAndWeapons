@@ -118,7 +118,9 @@ XF = XC - EXT
 # it is its mirror), once round the drum per row, never mirrored so the runes read
 RUNES = (690, 1400, 1797, 1903)  # atlas px x0, x1, y0, y1: the engraved rune band on the battle axe haft
 RSIGN = 1                        # which way round the runes run (checked on the render: they must read, not mirror)
-PLAIN = (1364, 1420, 388, 444)   # plain head-plate steel beside the face window (lowest texture + normal variation, 64 px scan)
+# plain steel: the haft-top ring's own wrap strip (battleaxe_20, atlas px x 70-170 across, y 70-716 round) - made to wrap a
+# drum, and large enough that the bare neck keeps real texture density (a 56 px patch drew the neck with ~no UV area)
+PLAIN = (70, 170, 70, 716)
 RING = (0.7759, 0.9756, 0.9544, 0.9721)                              # the steel collar ring's own strip (u0, u1, v0, v1)
 def px(x, y): return (x / 2048, 1 - y / 2048)
 def tri(t):
@@ -127,9 +129,19 @@ def frac_of(p, turn=0.0): return ((ang(p) + math.pi) / (2 * math.pi) + turn) % 1
 A0 = min(HX - v.co.x for v in ham.data.vertices)                    # where the barrel starts, socket end
 AL = HX - (XF + CH)                                                  # where the lip starts
 MARG = 0.45
-NROW = 2                         # two rows: one rune band round the drum is close to the band's own proportions
-HROW = (AL - A0 - 2 * MARG) / NROW
-CUTS = [A0 + MARG + k * HROW for k in range(NROW + 1)]               # zone boundaries (geometry is cut there)
+# the owner, 15:15: "the narrower part of the barrel that connects to the shaft, the text wrap is looking stretched" - the
+# neck is a flaring cone; runes wrapped on it warp. The neck stays plain steel and the runes start where the barrel is
+# full width (85% of the drum's radius); rows as many as fit at the band's own proportions (one band round the drum).
+# the barrel's outline (widest point per quarter unit, from the profile measured before the cut): the neck ends where the
+# outline first reaches 92% of the drum's radius and stays there
+_prof = sorted((HX - k, r) for k, r in bins.items() if HX - k >= A0 - 1e-6 and k >= XC)
+A_RUNE = next((a for i, (a, r) in enumerate(_prof) if all(rr >= 0.92 * RAD for _, rr in _prof[i:])), A0)
+A_RUNE = max(A_RUNE, A0 + MARG)
+if abs(A_RUNE - (HX - XC)) < 0.25: A_RUNE = HX - XC    # on the cut itself: a second cut a hair away left sliver faces
+H_NAT = 2 * math.pi * RAD * (RUNES[3] - RUNES[2]) / (RUNES[1] - RUNES[0])     # one band round, at the band's proportions
+NROW = max(1, round((AL - MARG - A_RUNE) / H_NAT))
+HROW = (AL - MARG - A_RUNE) / NROW
+CUTS = [A_RUNE + k * HROW for k in range(NROW + 1)]                  # zone boundaries (geometry is cut there)
 def zone(a):
     if a > AL + 1e-4: return "lip"
     if a < CUTS[0] or a > CUTS[-1]: return "plain"
@@ -142,12 +154,23 @@ def uv_at(p, z, flat=False, fr=None):
         f = frac_of(p); t = min(max((a - AL) / CH, 0), 1)
         return (RING[0] + f * (RING[1] - RING[0]), RING[3] - t * (RING[3] - RING[2]))
     if z == "plain":
-        s = tri(4 * frac_of(p)); t = min(max(a - A0, 0) / max(AL - A0, 1e-3), 1)
-        return px(PLAIN[0] + s * (PLAIN[1] - PLAIN[0]), PLAIN[2] + t * (PLAIN[3] - PLAIN[2]))
+        s = (fr if fr is not None else frac_of(p)) * 0.999; t = min(max(a - A0, 0) / max(AL - A0, 1e-3), 1)   # once round, no fold (a fold broke a tangent frame)
+        return px(PLAIN[0] + t * (PLAIN[1] - PLAIN[0]), PLAIN[2] + s * (PLAIN[3] - PLAIN[2]))
     k = int(z[3:])
-    s = fr if fr is not None else rune_frac(p, k); t = min(max((a - CUTS[k]) / HROW, 0), 1)
+    s = rune_s(fr if fr is not None else rune_frac(p, k), k); t = min(max((a - CUTS[k]) / HROW, 0), 1)
     return px(RUNES[0] + s * (RUNES[1] - RUNES[0]), RUNES[2] + t * (RUNES[3] - RUNES[2]))
-def rune_frac(p, k): return (RSIGN * frac_of(p) + 0.5 * k) % 1.0     # the second row turned half round: seams apart
+def rune_frac(p, k):                                                 # the second row turned half round: seams apart
+    f = (frac_of(p) + 0.5 * k) % 1.0; return f if RSIGN > 0 else 1.0 - f
+# the owner, 15:15: "the narrower part of the barrel that connects to the shaft, the text wrap is looking stretched" - a
+# whole band round the narrow neck squeezed the runes. Each row now shows as much of the band as its own girth holds
+# (its mean radius over the drum's), centred, so every rune keeps the band's proportions.
+def row_radius(k):
+    rs = [math.hypot(v.co.y - CY, v.co.z - CZ) for v in ham.data.vertices if CUTS[k] <= HX - v.co.x <= CUTS[k + 1]]
+    ext_part = max(0.0, min(CUTS[k + 1], AL) - max(CUTS[k], HX - XC)); bar_part = max(1e-6, (CUTS[k + 1] - CUTS[k]) - ext_part)
+    rb = sum(rs) / len(rs) if rs else RAD
+    return (rb * bar_part + RAD * ext_part) / (bar_part + ext_part)
+RSPAN = [min(1.0, row_radius(k) / RAD) for k in range(NROW)]   # ~1 now that the rows sit on the full-width drum
+def rune_s(f, k): return (1.0 - RSPAN[k]) / 2 + f * RSPAN[k]
 def surface(o):
     """cut the mesh at every zone boundary, then give each face the UVs of its zone (no face spans two windows)"""
     bm = bmesh.new(); bm.from_mesh(o.data)
@@ -160,14 +183,14 @@ def surface(o):
         z = "plain" if flat and zone(HX - f.calc_center_median().x) != "lip" else zone(HX - f.calc_center_median().x)
         count[z] = count.get(z, 0) + 1
         frs = [None] * len(f.loops)
-        if z.startswith("row"):    # one band round, not mirrored: a face across the band's seam keeps its corners together
-            frs = [rune_frac(l.vert.co, int(z[3:])) for l in f.loops]
+        if z.startswith("row") or (z == "plain" and not flat):   # once round, not mirrored: a face across the seam keeps its corners together
+            frs = [rune_frac(l.vert.co, int(z[3:])) if z != "plain" else frac_of(l.vert.co) for l in f.loops]
             if max(frs) - min(frs) > 0.5: frs = [x + 1.0 if x < 0.5 else x for x in frs]
         for l, fr in zip(f.loops, frs):
             l[uvl].uv = uv_at(l.vert.co, z, flat, fr)
     bm.to_mesh(o.data); bm.free(); count["hard_edges_split"] = harden(o); return count
 REP["surface"] = {"runes_px": RUNES, "plain_px": PLAIN, "ring_uv": RING, "a0": round(A0, 3), "lip_a": round(AL, 3),
-                  "row_h": round(HROW, 3), "barrel_faces_by_zone": surface(ham)}
+                  "row_h": round(HROW, 3), "rows": NROW, "runes_from_a": round(A_RUNE, 3), "row_h_natural": round(H_NAT, 3), "row_band_share": [round(x, 3) for x in RSPAN], "barrel_faces_by_zone": surface(ham)}
 
 fb = bmesh.new(); uvl = fb.loops.layers.uv.new("UVMap")
 def uv_of(p): return (FU0 + (p.y - CY + RAD) / (2 * RAD) * FUW, FV0 + (p.z - CZ + RAD) / (2 * RAD) * FUW)
@@ -262,6 +285,13 @@ json.dump(LOG, open(os.path.join(os.environ["NSAW_WORK"], "provenance_warhammer.
 
 # ---------------------------------------------------------------- game-ready (as the Ebony build_stage.py's warhammer)
 for o in WH: assert o.matrix_world == Matrix.Identity(4), o.name
+# zero-size faces left where a zone cut meets the round-3 cut (one drew a vertex with no tangent frame): removed
+REP["degenerate_dissolved"] = 0
+for o in WH:
+    bm = bmesh.new(); bm.from_mesh(o.data); nf = len(bm.faces)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.calc_area() < 1e-6], context="FACES")   # zero area: nothing to see
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    REP["degenerate_dissolved"] += nf - len(bm.faces); bm.to_mesh(o.data); bm.free()
 atlases = sorted({o["tex"] for o in WH}); assert atlases == ["axe2h"], atlases
 for o in list(bpy.data.objects):
     if o not in WH: bpy.data.objects.remove(o)
