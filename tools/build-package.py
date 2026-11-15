@@ -170,6 +170,30 @@ def main(out_root=None, test=False):
         os.makedirs(os.path.dirname(d), exist_ok=True)
         open(d, "wb").write(new)
         shipped.append(d)
+
+    # ---- the new weapon types' meshes, built from Legacy of Ysgramor's pieces by tools/build-missing-weapons.py
+    built_list = os.path.join(REPO, "plugin", "meshes-built.txt")
+    built_wanted = [l.strip() for l in open(built_list, encoding="utf-8") if l.strip()] if os.path.isfile(built_list) else []
+    if built_wanted:
+        bm = os.path.join(work, "built_meshes")
+        env = dict(os.environ, NSAW_DOWNLOADS=DOWNLOADS)
+        r = subprocess.run([sys.executable, os.path.join(HERE, "build-missing-weapons.py"), bm, "--work", os.path.join(work, "built_work")],
+                           capture_output=True, text=True, env=env)
+        if r.returncode != 0:
+            fail("the new weapon types failed to build:\n" + (r.stdout + r.stderr).strip()[-3000:])
+        print(r.stdout.strip().splitlines()[-1])
+        for ours in built_wanted:
+            s = os.path.join(bm, ours.replace("\\", os.sep))
+            if not os.path.isfile(s):
+                fail("the plugin points at '%s' and build-missing-weapons.py did not build it" % ours)
+            raw = open(s, "rb").read()
+            new = TEX_RE.sub(lambda m: NEW_TEX, raw)
+            if len(new) != len(raw):
+                fail("rewriting texture paths changed the size of %s" % ours)
+            d = os.path.join(core, "meshes", ours.replace("\\", os.sep))
+            os.makedirs(os.path.dirname(d), exist_ok=True)
+            open(d, "wb").write(new)
+            shipped.append(d)
     shutil.copy2(plugin, core)
 
     # ---- textures, derived from the rewritten meshes; looked up under the ORIGINAL names

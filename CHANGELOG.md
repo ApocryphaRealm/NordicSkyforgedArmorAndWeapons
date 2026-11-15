@@ -1,5 +1,13 @@
 # Changelog - Nordic Skyforged Armor and Weapons
 
+## 1.1.0 - 2026-11-15 - untested
+
+### Added
+- A Skyforge Steel Mace - the first of the weapon types the game has no Skyforge version of (the same set the Nordic Ebony replacer gained: mace, warhammer, bow, arrows and quiver), built one at a time. It is the Nordic Ebony mace's recipe re-made from NordwarUA's own STEEL war axe in Legacy of Ysgramor: the axe's haft, socket, collar, braided grip and pommel; a second twist-langet tube as the head core; the axe's knotwork bit six times round it as flanges; the axe's collar ring as the top and lower bands; and the axe's spike as the crown point - each piece keeping its own texture on the steel axe's atlas (Xtudo's Wolf Black, which this mod already ships; no new texture). Sized to match the Ebony mace's head. A new record (the game has no Skyforge mace): the vanilla Steel Mace with the game's own Skyforge uplift over Steel (damage 13, value 90, weight 14), forged at the Skyforge with Steel Smithing from the Steel Mace's ingredients and tempered with a steel ingot like the Skyforge war axe. It has its own first-person model and static. Built by tools/build-missing-weapons.py from the Legacy of Ysgramor download and the game's own meshes at build time - the repository carries no art.
+
+### Known
+- Untested in game: the mace in the hand, on the hip, in first person and at the Skyforge. Not yet in any levelled list or merchant - forged at the Skyforge only. The other new weapon types (warhammer, arrows and quiver, bow) follow one at a time.
+
 ## 1.0.0
 
 First release. The owner, 2026-09-16: *"i want to replace skyforged weapons and add skyforged armor,

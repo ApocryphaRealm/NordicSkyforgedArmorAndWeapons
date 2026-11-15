@@ -32,6 +32,13 @@ Ysgramor - 3BA Bodyslide** by **Xonek**: the CBBE 3BA slider sets and shape data
 as optional choices, renamed and repathed to this mod's folders by `tools/loy-refits.py`; the mod page
 names both authors and links back to both pages.
 
+## The new weapon types (1.1.0 on)
+
+The Skyforge Steel Mace (and the weapon types that follow it) is assembled at build time by
+`tools/build-missing-weapons.py` from pieces of NordwarUA's steel war axe in the same Legacy of Ysgramor download,
+each piece keeping its own texture; the node tree, blood shapes and collision it is built on come from the game's own
+ebony mace in the player's Skyrim - Meshes BSA. The repository carries none of these files.
+
 ## What IS ours
 
 `tools/`, `fomod/ModuleConfig.xml`, the plugin generator and the documentation.

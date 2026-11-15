@@ -18,6 +18,12 @@ WHAT THE PLUGIN DOES
        "i dont want to replace wolf armor, i want to replace skyforged weapons and add skyforged
        armor, leave wolf alone".
 
+    3. ADDS the Skyforge Steel weapon types the game has none of (the owner, 2026-11-15: the same
+       weapon types the Nordic Ebony replacer gained), one at a time - so far the MACE. See
+       NEW_WEAPONS: the vanilla Steel record plus the vanilla Skyforge uplift, its own first-person
+       static, forged at the Skyforge, tempered like the Skyforge war axe. Meshes from
+       tools/build-missing-weapons.py.
+
 WHERE THE RECORDS COME FROM
     Nothing is typed in from memory. The weapon and armour bodies are copied out of Skyrim.esm
     at build time; the armour ADDON bodies (the records that carry the worn model paths, the
@@ -73,6 +79,20 @@ WEAPONS = {
     "SkyforgeSteelDagger": ("Dagger.nif", "Skyforge Steel Dagger"),
 }
 
+# NEW Skyforge Steel weapons of the types the game has no Skyforge version of (built by tools/build-missing-weapons.py,
+# one at a time - the owner, 2026-11-15). Each is the vanilla Steel record of its type with the vanilla Skyforge uplift
+# the game gives its one-handed Skyforge weapons over Steel (sword and war axe: damage +3, value +25, weight unchanged),
+# critical damage half the damage rounded down (the game's own rule on the Steel and Skyforge swords). A new first-person
+# static (vanilla's are shared with the Steel weapons), forged at the Skyforge with Steel Smithing from the vanilla Steel
+# recipe's ingredients, tempered with the vanilla Skyforge war axe's recipe.
+#   our EDID: (name, vanilla template WEAP, its recipe, 3rd-person mesh, 1st-person mesh, template 1st-person STAT)
+NEW_WEAPONS = {
+    "SkyforgeSteelMace": ("Skyforge Steel Mace", "SteelMace", "RecipeWeaponSteelMace", "Mace.nif", "1stPersonMace.nif",
+                          "1stPersonSteelMace"),
+}
+SKYFORGE_UPLIFT = {"damage": 3, "value": 25}
+NEW_WEAPON_TEMPER = "TemperWeaponSkyforgeSteelWarAxe"
+
 # the armour set: (our EDID, display name, vanilla template ARMO, LoY addon EDIDs, LoY ground mesh,
 #                  forge ingredients [(formid, count)])
 ARMOUR = [
@@ -110,6 +130,7 @@ REFS = {
     "WEAP": {"ETYP": 1, "BIDS": 1, "BAMT": 1, "INAM": 1, "WNAM": 1, "TNAM": 1, "NAM9": 1,
              "NAM8": 1, "KWDA": "*", "CNAM": 1, "EITM": 1, "YNAM": 1, "ZNAM": 1},
     "COBJ": {"CNAM": 1, "BNAM": 1, "CNTO": "cnto"},
+    "STAT": {},
 }
 
 
@@ -188,7 +209,7 @@ def main():
     ap.add_argument("--loy", default=LOY_DEFAULT)
     a = ap.parse_args()
 
-    skyrim = Plugin(os.path.join(GAME_DATA, "Skyrim.esm"), ["ARMO", "WEAP", "COBJ"])
+    skyrim = Plugin(os.path.join(GAME_DATA, "Skyrim.esm"), ["ARMO", "WEAP", "COBJ", "STAT"])
     loy = Plugin(a.loy, ["ARMA", "ARMO"])
     # a plugin's own records sit at index len(masters) in its own numbering
     sky_ix = skyrim.masters + ["Skyrim.esm"]
@@ -355,8 +376,87 @@ def main():
         check_refs("COBJ", subs, sky_ix, "Temper" + our_edid)
         records.append(("COBJ", fid, src["ver"], subs))
 
+    # ---- 5. new weapon types: vanilla Steel bodies + the Skyforge uplift, own first-person static, forge and temper
+    new_weapon_meshes = []
+    for our_edid, (full, template, recipe, mesh3, mesh1, stat_template) in NEW_WEAPONS.items():
+        st = skyrim.get(stat_template)
+        stat_edid = "1stPerson" + our_edid
+        stat_fid = allot(stat_edid)
+        subs = []
+        for s, v in st["subs"]:
+            if s == b"EDID":
+                v = stat_edid.encode("latin-1") + b"\x00"
+            elif s == b"MODL":
+                v = ("%s\\weapons\\%s" % (MESH_ROOT, mesh1)).encode("latin-1") + b"\x00"
+            elif s == b"MODT":
+                continue
+            subs.append((s, v))
+        if not any(s == b"MODL" for s, v in subs):
+            fail("%s has no MODL" % stat_template)
+        check_refs("STAT", subs, sky_ix, stat_edid)
+        records.append(("STAT", stat_fid, st["ver"], subs))
+
+        src = skyrim.get(template)
+        fid = allot(our_edid)
+        subs, seen = [], set()
+        for s, v in src["subs"]:
+            seen.add(s)
+            if s == b"EDID":
+                v = our_edid.encode("latin-1") + b"\x00"
+            elif s == b"FULL":
+                v = full.encode("latin-1") + b"\x00"
+            elif s == b"DESC":
+                v = b"\x00"
+            elif s == b"MODL":
+                v = ("%s\\weapons\\%s" % (MESH_ROOT, mesh3)).encode("latin-1") + b"\x00"
+            elif s == b"MODT":
+                continue
+            elif s == b"WNAM":
+                v = struct.pack("<I", stat_fid)
+            elif s == b"DATA":
+                val, wt, dmg = struct.unpack_from("<IfH", v)
+                dmg += SKYFORGE_UPLIFT["damage"]; val += SKYFORGE_UPLIFT["value"]
+                v = struct.pack("<IfH", val, wt, dmg) + v[10:]
+                new_dmg = dmg
+            elif s == b"CRDT":
+                v = struct.pack("<H", new_dmg // 2) + v[2:]
+            subs.append((s, v))
+        for need in (b"MODL", b"WNAM", b"DATA", b"CRDT"):
+            if need not in seen:
+                fail("%s has no %s" % (template, need.decode()))
+        check_refs("WEAP", subs, sky_ix, our_edid)
+        records.append(("WEAP", fid, src["ver"], subs))
+        new_weapon_meshes += ["%s\\weapons\\%s" % (MESH_ROOT, mesh3), "%s\\weapons\\%s" % (MESH_ROOT, mesh1)]
+
+        # forge at the Skyforge: the vanilla Steel recipe, created object and workbench swapped
+        rc = skyrim.get(recipe)
+        rfid = allot("Recipe" + our_edid)
+        subs = []
+        for s, v in rc["subs"]:
+            if s == b"EDID":
+                v = ("Recipe" + our_edid).encode("latin-1") + b"\x00"
+            elif s == b"CNAM":
+                v = struct.pack("<I", fid)
+            elif s == b"BNAM":
+                v = struct.pack("<I", K_SKYFORGE)
+            subs.append((s, v))
+        check_refs("COBJ", subs, sky_ix, "Recipe" + our_edid)
+        records.append(("COBJ", rfid, rc["ver"], subs))
+        # temper: the vanilla Skyforge war axe's recipe with the created object swapped
+        tc = skyrim.get(NEW_WEAPON_TEMPER)
+        tfid = allot("Temper" + our_edid)
+        subs = []
+        for s, v in tc["subs"]:
+            if s == b"EDID":
+                v = ("Temper" + our_edid).encode("latin-1") + b"\x00"
+            elif s == b"CNAM":
+                v = struct.pack("<I", fid)
+            subs.append((s, v))
+        check_refs("COBJ", subs, sky_ix, "Temper" + our_edid)
+        records.append(("COBJ", tfid, tc["ver"], subs))
+
     # ---- emit, one group per type
-    order = ["ARMA", "ARMO", "WEAP", "COBJ"]
+    order = ["ARMA", "ARMO", "STAT", "WEAP", "COBJ"]
     groups = bytearray()
     counts = {}
     for rtype in order:
@@ -387,12 +487,18 @@ def main():
             f.write(m + "\n")
         for edid, (mesh, full) in WEAPONS.items():
             f.write("%s\\weapons\\%s\n" % (MESH_ROOT, mesh))
+    # the meshes tools/build-missing-weapons.py builds (not in Legacy of Ysgramor's archive)
+    with open(os.path.join(REPO, "plugin", "meshes-built.txt"), "w", encoding="utf-8") as f:
+        for m in new_weapon_meshes:
+            f.write(m + "\n")
 
     print("wrote %s" % out)
     print("  masters ............... %s" % ", ".join(masters))
     print("  records ............... %s" % ", ".join("%s %d" % (k, counts[k]) for k in order))
     print("  new records ........... %d at 0x%06X-0x%06X" % (nxt - FIRST_NEW, FIRST_NEW, nxt - 1))
     print("  weapon models moved ... %d" % len(WEAPONS))
+    print("  new weapon types ...... %d (%s), built meshes %d (plugin/meshes-built.txt)"
+          % (len(NEW_WEAPONS), ", ".join(NEW_WEAPONS), len(new_weapon_meshes)))
     print("  meshes the package owes  %d (plugin/meshes-needed.txt)" % (len(meshes_needed) + len(WEAPONS)))
     print("  light flag ............ set")
 
