@@ -39,16 +39,19 @@
 					<plugins order="Explicit">
 						<plugin name="HIMBO - prebuilt male meshes">
 							<description>The cuirass, boots, gauntlets and first-person arms refitted to HIMBO (zeroed sliders, so OBody and its kind work out of the box), from Trexasle's Legacy of Ysgramor - HIMBO Conversion. Overrides the male meshes; the helmet has no body under it and is unchanged.</description>
+							<image path="fomod\images\himbo.png" />
 							<files><folder source="30 HIMBO meshes" destination="" priority="2" /></files>
 							<typeDescriptor><type name="Optional" /></typeDescriptor>
 						</plugin>
 						<plugin name="HIMBO - BodySlide files">
 							<description>Slider sets and shape data to build the male set to your own HIMBO preset in BodySlide, under the group "Nordic Skyforged - HIMBO".</description>
+							<image path="fomod\images\himbo.png" />
 							<files><folder source="31 BodySlide - HIMBO" destination="" priority="2" /></files>
 							<typeDescriptor><type name="Optional" /></typeDescriptor>
 						</plugin>
 						<plugin name="CBBE 3BA - BodySlide files">
 							<description>Slider sets and shape data to build the female set to your CBBE 3BA preset in BodySlide (no physics), from Xonek's Legacy of Ysgramor - 3BA Bodyslide, under the group "Nordic Skyforged - CBBE 3BA". Nothing is prebuilt: build them once in BodySlide.</description>
+							<image path="fomod\images\cbbe3ba.png" />
 							<files><folder source="32 BodySlide - CBBE 3BA" destination="" priority="2" /></files>
 							<typeDescriptor><type name="Optional" /></typeDescriptor>
 						</plugin>

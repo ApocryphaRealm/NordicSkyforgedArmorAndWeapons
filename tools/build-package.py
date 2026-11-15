@@ -36,7 +36,7 @@ import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, ".."))
-DOWNLOADS = os.environ.get("NSAW_DOWNLOADS", r"D:\modlists\Njordlinger\downloads")
+DOWNLOADS = os.environ.get("NSAW_DOWNLOADS", r"C:\Modlists\Njordlinger-downloads")   # Njordlinger's download_directory
 SEVENZIP = [r"C:\Program Files\7-Zip\7z.exe", r"C:\Program Files (x86)\7-Zip\7z.exe", "7z"]
 
 A_BASE = "Main Archive SE-109963"              # NordwarUA - meshes, normals, masks, steel diffuses
@@ -54,7 +54,7 @@ assert len(OLD_TEX) == len(NEW_TEX)
 TEX_RE = re.compile(rb"textures[\\/]NordWar[\\/]Companions[\\/]", re.IGNORECASE)
 TEXPAT = re.compile(rb"[Tt]extures.{1,180}?\.dds")
 VANILLA_TEXTURES = ("textures\\blood\\", "textures\\cubemaps\\")
-IMAGES = ("header.png",)
+IMAGES = ("header.png", "himbo.png", "cbbe3ba.png")   # rendered from a built package by tools/installer-images.py
 
 
 def fail(msg):
