@@ -19,7 +19,8 @@ WHAT THE PLUGIN DOES
        armor, leave wolf alone".
 
     3. ADDS the Skyforge Steel weapon types the game has none of (the owner, 2026-11-15: the same
-       weapon types the Nordic Ebony replacer gained), one at a time - so far the MACE and the WARHAMMER. See
+       weapon types the Nordic Ebony replacer gained), one at a time - so far the MACE, the WARHAMMER and the
+       ARROW (NEW_AMMO: its own projectile, the quiver is part of the arrow's model). See
        NEW_WEAPONS: the vanilla Steel record plus the vanilla Skyforge uplift, its own first-person
        static, forged at the Skyforge, tempered like the Skyforge war axe. Meshes from
        tools/build-missing-weapons.py.
@@ -94,6 +95,13 @@ NEW_WEAPONS = {
                                "1stPersonWarhammer.nif", "1stPersonSteelWarhammer", "two-handed"),
 }
 SKYFORGE_UPLIFT = {"one-handed": {"damage": 3, "value": 25}, "two-handed": {"damage": 3, "value": 50}}
+# the arrow: the game has no Skyforge Steel arrow (its only Skyforge-made arrow is the Nord Hero arrow, damage 24, a far
+# higher tier). The Skyforge Steel Arrow is the vanilla Steel Arrow with the weapons' Skyforge pattern: damage +3 (10 -> 13),
+# value x1.5 as the Skyforge one-handed weapons cost over Steel (sword 70/45, war axe 80/55: 2 -> 3). Its own projectile
+# (the vanilla steel arrow's, model swapped). Forged at the Skyforge with Steel Smithing: 1 steel ingot + 1 firewood -> 24,
+# the game's own arrow-forging proportions (Dawnguard), since Skyrim.esm has no arrow recipe to copy.
+NEW_AMMO = {"SkyforgeSteelArrow": ("Skyforge Steel Arrow", "SteelArrow", "ArrowSteelProjectile", "Arrow.nif", "ArrowProjectile.nif",
+                                   {"damage": 3.0, "value_mult": 1.5}, [(0x0005ACE5, 1), (0x0006F993, 1)], 24)}
 NEW_WEAPON_TEMPER = "TemperWeaponSkyforgeSteelWarAxe"
 
 # the armour set: (our EDID, display name, vanilla template ARMO, LoY addon EDIDs, LoY ground mesh,
@@ -134,6 +142,8 @@ REFS = {
              "NAM8": 1, "KWDA": "*", "CNAM": 1, "EITM": 1, "YNAM": 1, "ZNAM": 1},
     "COBJ": {"CNAM": 1, "BNAM": 1, "CNTO": "cnto"},
     "STAT": {},
+    "AMMO": {"YNAM": 1, "ZNAM": 1, "KWDA": "*", "DATA": 1},
+    "PROJ": {},
 }
 
 
@@ -212,7 +222,7 @@ def main():
     ap.add_argument("--loy", default=LOY_DEFAULT)
     a = ap.parse_args()
 
-    skyrim = Plugin(os.path.join(GAME_DATA, "Skyrim.esm"), ["ARMO", "WEAP", "COBJ", "STAT"])
+    skyrim = Plugin(os.path.join(GAME_DATA, "Skyrim.esm"), ["ARMO", "WEAP", "COBJ", "STAT", "AMMO", "PROJ", "MISC"])
     loy = Plugin(a.loy, ["ARMA", "ARMO"])
     # a plugin's own records sit at index len(masters) in its own numbering
     sky_ix = skyrim.masters + ["Skyrim.esm"]
@@ -458,8 +468,58 @@ def main():
         check_refs("COBJ", subs, sky_ix, "Temper" + our_edid)
         records.append(("COBJ", tfid, tc["ver"], subs))
 
+    # ---- 6. new ammunition: the vanilla arrow + projectile, models swapped, Skyforge pattern, forged at the Skyforge
+    for our_edid, (full, template, proj_template, mesh, flight, uplift, ingredients, count) in NEW_AMMO.items():
+        pj = skyrim.get(proj_template)
+        proj_edid = our_edid + "Projectile"
+        proj_fid = allot(proj_edid)
+        subs = []
+        for s, v in pj["subs"]:
+            if s == b"EDID":
+                v = proj_edid.encode("latin-1") + b"\x00"
+            elif s == b"FULL":
+                v = full.encode("latin-1") + b"\x00"
+            elif s == b"MODL":
+                v = ("%s\\weapons\\%s" % (MESH_ROOT, flight)).encode("latin-1") + b"\x00"
+            elif s == b"MODT":
+                continue
+            subs.append((s, v))
+        check_refs("PROJ", subs, sky_ix, proj_edid)
+        records.append(("PROJ", proj_fid, pj["ver"], subs))
+        am = skyrim.get(template)
+        fid = allot(our_edid)
+        subs = []
+        for s, v in am["subs"]:
+            if s == b"EDID":
+                v = our_edid.encode("latin-1") + b"\x00"
+            elif s == b"FULL":
+                v = full.encode("latin-1") + b"\x00"
+            elif s == b"DESC":
+                v = b"\x00"
+            elif s == b"MODL":
+                v = ("%s\\weapons\\%s" % (MESH_ROOT, mesh)).encode("latin-1") + b"\x00"
+            elif s == b"MODT":
+                continue
+            elif s == b"DATA":
+                _, flags, dmg, val = struct.unpack_from("<IIfI", v)
+                v = struct.pack("<IIfI", proj_fid, flags, dmg + uplift["damage"], int(round(val * uplift["value_mult"]))) + v[16:]
+            subs.append((s, v))
+        check_refs("AMMO", subs, sky_ix, our_edid)
+        records.append(("AMMO", fid, am["ver"], subs))
+        new_weapon_meshes += ["%s\\weapons\\%s" % (MESH_ROOT, mesh), "%s\\weapons\\%s" % (MESH_ROOT, flight)]
+        for item, _ in ingredients:
+            if item not in skyrim.by_fid:
+                fail("ingredient %08X is not in Skyrim.esm" % item)
+        rfid = allot("Recipe" + our_edid)
+        subs = [(b"EDID", ("Recipe" + our_edid).encode("latin-1") + b"\x00"), (b"COCT", struct.pack("<I", len(ingredients)))]
+        subs += [(b"CNTO", struct.pack("<II", item, n)) for item, n in ingredients]
+        subs += [(b"CTDA", ctda_has_perk(PERK_STEEL)), (b"CNAM", struct.pack("<I", fid)), (b"BNAM", struct.pack("<I", K_SKYFORGE)),
+                 (b"NAM1", struct.pack("<H", count))]
+        check_refs("COBJ", subs, sky_ix, "Recipe" + our_edid)
+        records.append(("COBJ", rfid, temper_ver, subs))
+
     # ---- emit, one group per type
-    order = ["ARMA", "ARMO", "STAT", "WEAP", "COBJ"]
+    order = ["ARMA", "ARMO", "STAT", "PROJ", "WEAP", "AMMO", "COBJ"]
     groups = bytearray()
     counts = {}
     for rtype in order:

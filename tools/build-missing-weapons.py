@@ -6,6 +6,7 @@ Nordic Ebony Armor and Weapons Replacer gained in 1.1.0 (mace, warhammer, bow, a
 BUILT SO FAR
     mace       ->  meshes\NordicSkyforge\weapons\Mace.nif and 1stPersonMace.nif       (missing_weapons\stage_mace.py)
     warhammer  ->  meshes\NordicSkyforge\weapons\Warhammer.nif and 1stPersonWarhammer.nif (missing_weapons\stage_warhammer.py)
+    arrow      ->  meshes\NordicSkyforge\weapons\Arrow.nif (with the quiver) and ArrowProjectile.nif (missing_weapons\stage_arrow.py)
 
 WHERE THE ART COMES FROM
     Every piece is cut from NordwarUA's own STEEL Wolf war axe (Legacy of Ysgramor, Nexus 109963 - modification and
@@ -50,9 +51,17 @@ ITEMS = {
     "warhammer": {"stage": "stage_warhammer.py", "loy": "BattleAxe.nif", "env": "NSAW_BAXE", "van_env": "NSAW_VAN_WARHAMMER",
                   "outputs": {"Warhammer.nif": ("ebonywarhammer.nif", "EbonyWarhammer:0"),
                               "1stPersonWarhammer.nif": ("1stpersonebonywarhammer.nif", "1stPersonEbonyWarhammer:0")}},
+    # the arrow (with its quiver and six quiver arrows) and the arrow in flight; no first-person file (ammunition has none)
+    "arrow": {"stage": "stage_arrow.py", "loy": "Axe.nif", "env": "NSAW_AXE", "van_env": "NSAW_VAN_ARROW", "kind": "arrow",
+              "extra_loy": {"NSAW_DAGGER": "Dagger.nif"},
+              "outputs": {"Arrow.nif": ("ebonyarrow.nif", ("Arrow:0", "ArrowQuiver:0", "ArrowQuiver:1") + tuple("Arrow%d" % k for k in range(1, 7))),
+                          "ArrowProjectile.nif": ("ebonyarrowprojectile.nif", ("EbonyArrowFlight:0",))}},
 }
+# light through the mesh, gated on the arrow files as on the Ebony replacer (owner 2026-11-14 07:15: light through the
+# nocked arrow); the mace and warhammer are measured and reported
+SEE_THROUGH_MAX, SEE_THROUGH_GATED = 0.004, {"Arrow.nif", "ArrowProjectile.nif"}
 # atlas -> (LoY file, the shape whose shader and texture set the built shape takes)
-LOY_SHADER = {"axe1h": ("Axe.nif", "Axe2"), "axe2h": ("BattleAxe.nif", "BattleAxe2")}
+LOY_SHADER = {"axe1h": ("Axe.nif", "Axe2"), "axe2h": ("BattleAxe.nif", "BattleAxe2"), "dagger": ("Dagger.nif", "Scb")}
 
 
 def fail(msg):
@@ -110,7 +119,7 @@ def loy_weapons(work):
     if not arc:
         fail("no 'Main Archive SE-109963' in %s - download Legacy of Ysgramor's main file from Nexus first" % dl)
     tmp = os.path.join(work, "loy_x"); out = os.path.join(work, "loy"); os.makedirs(out, exist_ok=True)
-    for name in sorted({it["loy"] for it in ITEMS.values()}):
+    for name in sorted({it["loy"] for it in ITEMS.values()} | {f for it in ITEMS.values() for f in it.get("extra_loy", {}).values()}):
         p = subprocess.run([sevenzip(), "x", "-y", "-o" + tmp, os.path.join(dl, arc[-1]), "-ir!*Companions\\Weapons\\" + name],
                            capture_output=True, text=True)
         if p.returncode != 0:
@@ -147,8 +156,8 @@ def build_item(item, spec, loy, van, work, out_dir):
     import assemble, verify
     bw = os.path.join(work, "blender_" + item)
     first3 = [v for v, _ in spec["outputs"].values() if not v.startswith("1stperson")][0]
-    first1 = [v for v, _ in spec["outputs"].values() if v.startswith("1stperson")][0]
     env = dict(os.environ, NSAW_WORK=bw, **{spec["env"]: os.path.join(loy, spec["loy"]), spec["van_env"]: os.path.join(van, first3)})
+    env.update({k: os.path.join(loy, v) for k, v in spec.get("extra_loy", {}).items()})
     log = os.path.join(work, "blender_%s.log" % item)
     with open(log, "w", encoding="utf-8") as lf:
         r = subprocess.run([blender(), "--background", "--factory-startup", "--python-exit-code", "1", "--python",
@@ -158,16 +167,33 @@ def build_item(item, spec, loy, van, work, out_dir):
         fail("the Blender stage for the %s failed (log %s):\n%s" % (item, log, tail))
     stage = json.load(open(os.path.join(bw, "stage_report.json")))
     assemble.LOY_SHADER = LOY_SHADER
-    shapes = os.path.join(bw, "shapes"); split = stage["head_split_y"][item]
-    off = assemble.first_person_offset(os.path.join(van, first3), os.path.join(van, first1))
+    shapes = os.path.join(bw, "shapes")
     rep = {"stage": stage, "assemble": {}, "verify": {}}
-    for out_name, (van_name, _) in spec["outputs"].items():
-        rep["assemble"][out_name] = assemble.build_static(item, os.path.join(van, van_name), os.path.join(out_dir, out_name),
-                                                          shapes, loy, split, [0, 0, 0] if van_name == first3 else off)
+    if spec.get("kind") == "arrow":
+        import assemble_arrow
+        (a_out, (a_van, _)), (f_out, (f_van, _)) = list(spec["outputs"].items())
+        rep["assemble"]["Arrow"] = assemble_arrow.build_arrow(os.path.join(van, a_van), os.path.join(van, f_van), os.path.join(out_dir, a_out),
+                                                              os.path.join(out_dir, f_out), shapes, loy, "axe1h", "dagger", "axe1h")
+    else:
+        first1 = [v for v, _ in spec["outputs"].values() if v.startswith("1stperson")][0]
+        split = stage["head_split_y"][item]
+        off = assemble.first_person_offset(os.path.join(van, first3), os.path.join(van, first1))
+        for out_name, (van_name, _) in spec["outputs"].items():
+            rep["assemble"][out_name] = assemble.build_static(item, os.path.join(van, van_name), os.path.join(out_dir, out_name),
+                                                              shapes, loy, split, [0, 0, 0] if van_name == first3 else off)
     faults = 0
     for out_name, (van_name, ours) in spec["outputs"].items():
-        v = verify.check(os.path.join(out_dir, out_name), os.path.join(van, van_name), {ours})
+        v = verify.check(os.path.join(out_dir, out_name), os.path.join(van, van_name), {ours} if isinstance(ours, str) else set(ours))
+        if out_name in SEE_THROUGH_GATED and (v["see_through_share"] is None or v["see_through_share"] > SEE_THROUGH_MAX):
+            v["faults"].append(("light through the mesh: rays meet a back face first and no front face after", v["see_through_share"]))
         rep["verify"][out_name] = v; faults += len(v["faults"])
+    if spec.get("kind") == "arrow":     # the game hides the quiver arrows one by one by name: exactly Arrow1..6 under ArrowQuiver
+        import niflib
+        n = niflib.Nif(os.path.join(out_dir, "Arrow.nif"))
+        q = [b for b in range(len(n.blocks)) if n.btypes[b] == "NiNode" and n.name(b) == "ArrowQuiver"][0]
+        kids = sorted(n.name(c) for c in n.children(q)[0] if c >= 0 and n.btypes[c] == "BSTriShape" and n.name(c)[5:].isdigit())
+        if kids != ["Arrow%d" % k for k in range(1, 7)]:
+            rep["verify"]["Arrow.nif"]["faults"].append(("quiver arrows", kids)); faults += 1
     return rep, faults
 
 

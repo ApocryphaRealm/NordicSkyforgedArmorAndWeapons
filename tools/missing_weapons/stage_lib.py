@@ -234,3 +234,105 @@ def make_blood(srcs, ylo, name, uvbox, offset=0.012, cap=900):
             l[uvl].uv = (u0 + (u1 - u0) * (l.vert.co.y - lo.y) / (hi.y - lo.y), v0 + (v1 - v0) * (l.vert.co.x - lo.x) / (hi.x - lo.x))
     bm.to_mesh(me); bm.free(); me.update()
     return b
+
+
+# ---- the Ebony build_stage.py's piece-closing functions, unchanged (bow and arrow light-through, 1.1.0 2026-11-14)
+def cap_holes(o):
+    """Close every open boundary of a piece. The pieces are cut from the Wolf weapons, where an open end sat hidden inside
+    the next piece (a blade's base in its guard, the axe spike's foot in the head); re-used elsewhere the hole shows, and
+    the game draws one side of a triangle, so through it the far wall's BACK is seen - culled - and the light behind
+    comes through (bow grip and arrowhead, owner 2026-11-14 07:15). Each cap gets its own vertices (a hard edge the game
+    can see) and a planar UV window the size of its rim's UV spread, centred on it - never zero UV area."""
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    lay = bm.faces.layers.int.get("neaw_cap") or bm.faces.layers.int.new("neaw_cap")     # (a new layer drops face handles)
+    rim = [e for e in bm.edges if e.is_boundary]
+    if not rim: bm.free(); return 0
+    uvl = bm.loops.layers.uv.active
+    old = set(bm.faces)
+    bmesh.ops.holes_fill(bm, edges=rim, sides=0)
+    key = lambda f: frozenset(tuple(round(c, 3) for c in v.co) for v in f.verts)
+    sets = {key(f) for f in old}          # a lone loose triangle's own rim "fills" as its reverse twin: drop those
+    nk_ = {}
+    for f in bm.faces:
+        if f not in old: nk_.setdefault(key(f), []).append(f)
+    # ... and two caps on one rim (a sliver whose rim pinches at a vertex) are a back-to-back pair: drop both
+    bmesh.ops.delete(bm, geom=[f for k_, fs in nk_.items() for f in fs if k_ in sets or len(fs) > 1], context="FACES_ONLY")
+    new = [f for f in bm.faces if f not in old]
+    caps = []
+    for f in new:                                  # the rim's UVs, per cap
+        rim_uv = [m[uvl].uv.copy() for l in f.loops for m in l.vert.link_loops if m.face not in new]
+        cu = sum(rim_uv, Vector((0, 0))) / max(1, len(rim_uv))
+        span = max(max(u.x for u in rim_uv) - min(u.x for u in rim_uv), max(u.y for u in rim_uv) - min(u.y for u in rim_uv), 2e-3) if rim_uv else 2e-3
+        ext = max((l.vert.co - f.calc_center_median()).length for l in f.loops) or 1e-6
+        caps.append((cu, span, ext, set(f.verts)))
+    bmesh.ops.triangulate(bm, faces=new, quad_method="BEAUTY", ngon_method="BEAUTY"); tri = [f for f in bm.faces if f not in old]
+    # a cap folded over on itself (a twisted 4-edge rim on a plate's thin edge, triangulated across the wrong diagonal: its
+    # two triangles face opposite ways, one of them always inward) takes the other diagonal
+    for _ in range(3):
+        folded = [e for e in bm.edges if len(e.link_faces) == 2 and all(f not in old for f in e.link_faces)
+                  and e.link_faces[0].normal.dot(e.link_faces[1].normal) < -0.2]
+        if not folded: break
+        bmesh.ops.rotate_edges(bm, edges=folded, use_ccw=False)
+        for f in bm.faces: f.normal_update()
+    tk = {}
+    for f in bm.faces:
+        if f not in old: tk.setdefault(key(f), []).append(f)
+    # a rim that passes one point twice triangulates into a back-to-back pair or a zero-area sliver: dropped
+    bmesh.ops.delete(bm, geom=[f for k_, fs in tk.items() for f in fs if len(fs) > 1 or k_ in sets or f.calc_area() < 1e-9],
+                     context="FACES_ONLY")
+    tri = [f for f in bm.faces if f not in old]
+    for f in tri: f[lay] = 1
+    for f in tri:                                  # each triangle projected along its OWN normal: never zero UV area
+        cu, span, ext, _ = next(c for c in caps if set(f.verts) <= c[3])
+        f.normal_update(); n_ = f.normal if f.normal.length > 1e-9 else Vector((0, 0, 1))
+        a_ = n_.orthogonal().normalized(); b_ = n_.cross(a_).normalized(); c_ = f.calc_center_median()
+        for l in f.loops:
+            d_ = l.vert.co - c_
+            l[uvl].uv = (cu.x + 0.5 * span * d_.dot(a_) / ext, cu.y + 0.5 * span * d_.dot(b_) / ext)
+    bmesh.ops.split_edges(bm, edges=[e for e in bm.edges if len(e.link_faces) == 2 and
+                                     (e.link_faces[0] in old) != (e.link_faces[1] in old)])
+    bm.to_mesh(o.data); bm.free(); o.data.update()
+    return len(rim)
+
+def weld_join(objs, name, **props):
+    """pieces that meet along their rims (a fang cut into five parts, an arrowhead in four) joined and welded into ONE
+    piece before cap_holes: capped apart, their caps met back to back inside and the welded edges they share had three or
+    more faces - the surface could not be told inside from outside (the arrowhead came out inside-out, 1.1.0 2026-11-14)"""
+    tex = {o["tex"] for o in objs}; assert len(tex) == 1, (name, tex)
+    j = join(list(objs), name)
+    bm = bmesh.new(); bm.from_mesh(j.data); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+    grp = {}
+    for f in bm.faces: grp.setdefault(frozenset(f.verts), []).append(f)
+    kill = []                             # faces the weld made coincident: a wall between two pieces (both go), or a repeat
+    for fs in grp.values():
+        if len(fs) > 1:
+            for f in fs: f.normal_update()
+            same = all(f.normal.dot(fs[0].normal) > 0 for f in fs[1:])
+            kill += fs[1:] if same else fs
+    bmesh.ops.delete(bm, geom=kill, context="FACES_ONLY"); bm.to_mesh(j.data); bm.free(); j.data.update()
+    j["tex"] = tex.pop()
+    for k, v in props.items(): j[k] = v
+    return j
+
+def double_caps(o):
+    """every cap_holes cap made two-sided: a reversed twin on its own vertices. A cap sits where the piece's inside and
+    outside meet several pieces at once (the arrowhead's four blades at its foot), where no ray vote can tell its outside;
+    two-sided, it covers the hole from both sides whichever way it was wound. Run AFTER orient_outward (which would turn
+    the twin back round to match). The pieces stay hard-edged: the twin's vertices are its own."""
+    bm = bmesh.new(); bm.from_mesh(o.data); lay = bm.faces.layers.int.get("neaw_cap")
+    if lay is None: bm.free(); return 0
+    caps = [f for f in bm.faces if f[lay] == 1]
+    if not caps: bm.free(); return 0
+    geom = bmesh.ops.duplicate(bm, geom=caps)["geom"]
+    twins = [g for g in geom if isinstance(g, bmesh.types.BMFace)]
+    bmesh.ops.reverse_faces(bm, faces=twins)
+    for f in twins: f[lay] = 2
+    bm.normal_update(); bm.to_mesh(o.data); bm.free(); o.data.update()
+    return len(twins)
+
+# ---------------------------------------------------------------- the arrow's NOCK (owner 2026-11-14 06:48)
+# The paw pommel (waraxe_26 x0.3) read as a pommel, with nothing for the string. It becomes a real nock: a short black-
+# steel cylinder over the shaft's end with a SLOT across its end for the bowstring, and the war axe's gold collar
+# (waraxe_24, the piece round the quiver mouth) as a band where it meets the shaft. The slot runs along x: the string lies
+# across the arrow at right angles to the cock vane (vane 0 stands at +z, the other two at +-120 deg), as on a real
+# three-vane arrow. The three vanes move back until their rear ends meet the nock.
