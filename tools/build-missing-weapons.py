@@ -9,6 +9,8 @@ BUILT SO FAR
     arrow      ->  meshes\NordicSkyforge\weapons\Arrow.nif (with the quiver) and ArrowProjectile.nif (missing_weapons\stage_arrow.py)
     bow        ->  meshes\NordicSkyforge\weapons\Bow.nif (the Ebony r03 bow, ebony_pipeline\ + assemble_bow.py; its first-person
                    record uses the same file)
+    first person -> meshes\NordicSkyforge\weapons\1stPersonSword/Greatsword/Axe/BattleAxe/Dagger.nif for the five weapons
+                   the mod already had (FIRST_PERSON, first_person_files)
 
 WHERE THE ART COMES FROM
     Every piece is cut from NordwarUA's own STEEL Wolf war axe (Legacy of Ysgramor, Nexus 109963 - modification and
@@ -63,6 +65,18 @@ ITEMS = {
     "bow": {"kind": "bow", "loy": "Sword.nif", "env": "NSAW_SWORD", "van_env": "NSAW_VAN_BOW",
             "outputs": {"Bow.nif": ("ebonybowskinned.nif", ("BowMesh:0", "BowMesh:1"))}},
 }
+# FIRST-PERSON FILES for the five Skyforge weapons the mod already had (sword, greatsword, war axe, battleaxe, dagger) -
+# the way the Nordic Ebony replacer made its first-person set (assemble.first_person_copy): the Legacy of Ysgramor
+# weapon's 3rd-person model under a first-person name, its root renamed to vanilla's first-person root, NOT moved.
+# Not moved because Legacy of Ysgramor's own plugin points these same five Skyforge Steel weapons' first-person statics
+# at the 3rd-person file (checked 2026-11-15: SkyforgeSteelSword WNAM -> NordWar\Companions\Weapons\Sword.nif, and so on).
+# Vanilla's own steel pairs are moved slightly (greatsword 1.79 along the blade, war axe 0.99 across) - reported, not used.
+#   LoY 3rd-person file: (our 1st-person file, vanilla 3rd-person steel file, vanilla 1st-person steel file)
+FIRST_PERSON = {"Sword.nif": ("1stPersonSword.nif", "steelsword.nif", "1stpersonsteelsword.nif"),
+                "Greatsword.nif": ("1stPersonGreatsword.nif", "steelgreatsword.nif", "1stpersonsteelgreatsword.nif"),
+                "Axe.nif": ("1stPersonAxe.nif", "steelwaraxe.nif", "1stpersonsteelwaraxe.nif"),
+                "BattleAxe.nif": ("1stPersonBattleAxe.nif", "steelbattleaxe.nif", "1stpersonsteelbattleaxe.nif"),
+                "Dagger.nif": ("1stPersonDagger.nif", "steeldagger.nif", "1stpersonsteeldagger.nif")}
 # the Ebony pipeline's inputs: Legacy of Ysgramor's ebony weapons under the vanilla names it reads them by, and the vanilla
 # ebony meshes it builds on (the Ebony replacer's build-missing-weapons.py LOY and VANILLA lists)
 EBONY_LOY = {"SwordEbony.nif": "ebonysword.nif", "GreatswordEbony.nif": "ebonygreatsword.nif", "AxeEbony.nif": "ebonywaraxe.nif",
@@ -135,7 +149,7 @@ def loy_weapons(work):
     if not arc:
         fail("no 'Main Archive SE-109963' in %s - download Legacy of Ysgramor's main file from Nexus first" % dl)
     tmp = os.path.join(work, "loy_x"); out = os.path.join(work, "loy"); os.makedirs(out, exist_ok=True)
-    for name in sorted({it["loy"] for it in ITEMS.values()} | {f for it in ITEMS.values() for f in it.get("extra_loy", {}).values()} | set(EBONY_LOY)):
+    for name in sorted({it["loy"] for it in ITEMS.values()} | {f for it in ITEMS.values() for f in it.get("extra_loy", {}).values()} | set(EBONY_LOY) | set(FIRST_PERSON)):
         p = subprocess.run([sevenzip(), "x", "-y", "-o" + tmp, os.path.join(dl, arc[-1]), "-ir!*Companions\\Weapons\\" + name],
                            capture_output=True, text=True)
         if p.returncode != 0:
@@ -166,6 +180,32 @@ def vanilla_meshes(work):
     for w, b in got.items():
         d = os.path.join(root, os.path.basename(w)); os.makedirs(root, exist_ok=True); open(d, "wb").write(b)
     return root
+
+
+def first_person_files(loy, work, out_dir):
+    """the five existing weapons' first-person files - see FIRST_PERSON"""
+    import bsa, assemble, niflib, struct
+    data = game_data(); want = ["meshes\\weapons\\steel\\" + f for v in FIRST_PERSON.values() for f in v[1:]]; got = {}
+    for name in ("Skyrim - Meshes0.bsa", "Skyrim - Meshes1.bsa"):
+        p = os.path.join(data, name)
+        if os.path.isfile(p):
+            got.update(bsa.extract(p, [w for w in want if w not in got], strict=False))
+    if any(w not in got for w in want):
+        fail("the game's mesh archives have no %s" % [w for w in want if w not in got])
+    van = os.path.join(work, "vanilla_steel"); os.makedirs(van, exist_ok=True)
+    for w, b in got.items(): open(os.path.join(van, os.path.basename(w)), "wb").write(b)
+    rep, faults = {}, []
+    for third, (first, v3, v1) in FIRST_PERSON.items():
+        n = niflib.Nif(os.path.join(loy, third)); vn = niflib.Nif(os.path.join(van, v1)); root = n.roots[0]
+        n.blocks[root][0:4] = struct.pack("<i", assemble.new_string(n, vn.name(vn.roots[0])))
+        out = os.path.join(out_dir, first); assemble.save(n, out)
+        a, b = niflib.Nif(os.path.join(loy, third)), niflib.Nif(out)       # read back: the same shapes, the same geometry
+        sa = {a.name(x): bytes(a.blocks[x][4:]) for x in assemble.shapes_of(a)}; sb = {b.name(x): bytes(b.blocks[x][4:]) for x in assemble.shapes_of(b)}
+        if sa != sb or b.name(b.roots[0]) != vn.name(vn.roots[0]):
+            faults.append((first, "read-back differs from %s" % third))
+        rep[first] = {"from": third, "root": b.name(b.roots[0]), "shapes": sorted(sb),
+                      "vanilla_steel_1st_vs_3rd_offset (not applied)": assemble.first_person_offset(os.path.join(van, v3), os.path.join(van, v1)).tolist()}
+    return rep, faults
 
 
 def ebony_stage(loy, van, work):
@@ -256,13 +296,17 @@ def main(out_meshes, work=None, only=None):
         if only and item not in only:
             continue
         rep[item], f = build_item(item, spec, loy, van, work, out_dir); faults += f; outputs += list(spec["outputs"])
+    if not only or "first" in only:
+        rep["first_person"], fp_faults = first_person_files(loy, work, out_dir)
+        faults += len(fp_faults); outputs += [v[0] for v in FIRST_PERSON.values()]
+        if fp_faults: rep["first_person"]["faults"] = fp_faults
     json.dump(rep, open(os.path.join(work, "build_report.json"), "w"), indent=1, default=str)
     missing = [f for f in outputs if not os.path.isfile(os.path.join(out_dir, f))]
     if missing:
         fail("not built: %s" % missing)
     if faults:
         fail("%d verification fault(s) - see %s" % (faults, os.path.join(work, "build_report.json")))
-    st = {k: v["see_through_share"] for r in rep.values() for k, v in r["verify"].items()}
+    st = {k: v["see_through_share"] for r in rep.values() for k, v in r.get("verify", {}).items()}
     print("missing weapons built: %d files in %s (light-through, reported: %s; report %s)"
           % (len(outputs), out_dir, st, os.path.join(work, "build_report.json")))
     return out_dir, rep

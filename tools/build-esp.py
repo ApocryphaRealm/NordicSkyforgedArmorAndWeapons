@@ -8,7 +8,8 @@ WHAT THE PLUGIN DOES
     1. REPLACES the five vanilla Skyforge Steel weapons' models with NordwarUA's steel wolf
        weapons from Legacy of Ysgramor: the sword, greatsword, war axe, battleaxe and dagger.
        Everything else about those records - damage, value, keywords, sounds - stays vanilla,
-       because the body is copied from Skyrim.esm and only MODL changes.
+       because the body is copied from Skyrim.esm and only MODL changes - and, since 1.1.0, WNAM, which
+       names each weapon's own first-person static (section 7) instead of vanilla Steel's shared one.
 
     2. ADDS a Skyforge Steel armour set - cuirass, boots, gauntlets, helmet and shield - built
        from the steel wolf armour of the same mod (the fur-collared cuirass). The stats are the
@@ -268,6 +269,7 @@ def main():
                          "masters Skyrim.esm only" % (where, s.decode(), fid))
 
     # ---- 1. the weapons: vanilla bodies, models repointed
+    replaced_weapons = {}
     for edid, (mesh, full) in WEAPONS.items():
         rec = skyrim.get(edid)
         subs = []
@@ -284,6 +286,7 @@ def main():
             subs.append((s, v))
         check_refs("WEAP", subs, sky_ix, edid)
         records.append(("WEAP", rec["fid"], rec["ver"], subs))
+        replaced_weapons[edid] = subs        # WNAM repointed at the end (section 7), so 1.0.0's FormIDs stay put
 
     # ---- 2. the armour addons: LoY's bodies, models repointed, one per piece/race
     def repath(v):
@@ -533,6 +536,35 @@ def main():
                  (b"NAM1", struct.pack("<H", count))]
         check_refs("COBJ", subs, sky_ix, "Recipe" + our_edid)
         records.append(("COBJ", rfid, temper_ver, subs))
+
+    # ---- 7. first person for the five replaced weapons (1.1.0): their WNAM named vanilla's Steel first-person statics,
+    # which the Steel weapons share, so in first person they showed vanilla steel. Each gets its own static (vanilla's
+    # copied, model swapped) on tools/build-missing-weapons.py's first-person copy of its model. Allotted LAST so every
+    # 1.0.0 FormID stays where it was.
+    for edid, (mesh, full) in WEAPONS.items():
+        subs = replaced_weapons[edid]
+        wi = [i for i, (s, v) in enumerate(subs) if s == b"WNAM"]
+        if len(wi) != 1:
+            fail("%s has %d WNAM" % (edid, len(wi)))
+        st = skyrim.by_fid.get(struct.unpack("<I", subs[wi[0]][1])[0])
+        if st is None or st["type"] != "STAT":
+            fail("%s's WNAM is not a Skyrim.esm static" % edid)
+        stat_edid = "1stPerson" + edid
+        stat_fid = allot(stat_edid)
+        mesh1 = "%s\\weapons\\1stPerson%s" % (MESH_ROOT, mesh)
+        ssubs = []
+        for s, v in st["subs"]:
+            if s == b"EDID":
+                v = stat_edid.encode("latin-1") + b"\x00"
+            elif s == b"MODL":
+                v = mesh1.encode("latin-1") + b"\x00"
+            elif s == b"MODT":
+                continue
+            ssubs.append((s, v))
+        check_refs("STAT", ssubs, sky_ix, stat_edid)
+        records.append(("STAT", stat_fid, st["ver"], ssubs))
+        subs[wi[0]] = (b"WNAM", struct.pack("<I", stat_fid))
+        new_weapon_meshes.append(mesh1)
 
     # ---- emit, one group per type
     order = ["ARMA", "ARMO", "STAT", "PROJ", "WEAP", "AMMO", "COBJ"]

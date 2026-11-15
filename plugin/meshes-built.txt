@@ -5,3 +5,8 @@ NordicSkyforge\weapons\1stPersonWarhammer.nif
 NordicSkyforge\weapons\Bow.nif
 NordicSkyforge\weapons\Arrow.nif
 NordicSkyforge\weapons\ArrowProjectile.nif
+NordicSkyforge\weapons\1stPersonSword.nif
+NordicSkyforge\weapons\1stPersonGreatsword.nif
+NordicSkyforge\weapons\1stPersonAxe.nif
+NordicSkyforge\weapons\1stPersonBattleAxe.nif
+NordicSkyforge\weapons\1stPersonDagger.nif

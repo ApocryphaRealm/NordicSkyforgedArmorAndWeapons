@@ -11,6 +11,7 @@
 
 ### Changed
 - The Skyforge Steel Shield is the size of the Truly Nordic Carved "Shield - Clean" (the face 62.2 -> 52.8 units, x0.848), as the Nordic Ebony replacer's shield was made in 1.1.0. Scaled about the grip, so it sits where it did on the arm and on the back; the collision shrinks with it. Done at build time on Legacy of Ysgramor's own file (the steel shield is the same mesh as the ebony one, so the same tool is used unchanged).
+- First-person models for the five Skyforge weapons the set already had (sword, greatsword, war axe, battleaxe, dagger): until now their first-person records were vanilla Steel's, so in first person they showed the vanilla steel weapons. Each now has its own first-person record on a first-person copy of its Legacy of Ysgramor model (the way the Nordic Ebony replacer made its first-person set, and the way Legacy of Ysgramor's own plugin does for these five weapons). The five new records are added after every 1.0.0 record, so no earlier FormID moves.
 
 ### Known
 - Untested in game: the mace, warhammer, bow and arrows in the hand, on the hip and back, in first person, the bow draw, arrows in flight, the quiver on the back (its six arrows disappearing as they are used) and at the Skyforge. Not yet in any levelled list or merchant - forged at the Skyforge only.
