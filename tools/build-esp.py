@@ -19,7 +19,7 @@ WHAT THE PLUGIN DOES
        armor, leave wolf alone".
 
     3. ADDS the Skyforge Steel weapon types the game has none of (the owner, 2026-11-15: the same
-       weapon types the Nordic Ebony replacer gained), one at a time - so far the MACE. See
+       weapon types the Nordic Ebony replacer gained), one at a time - so far the MACE and the WARHAMMER. See
        NEW_WEAPONS: the vanilla Steel record plus the vanilla Skyforge uplift, its own first-person
        static, forged at the Skyforge, tempered like the Skyforge war axe. Meshes from
        tools/build-missing-weapons.py.
@@ -81,16 +81,19 @@ WEAPONS = {
 
 # NEW Skyforge Steel weapons of the types the game has no Skyforge version of (built by tools/build-missing-weapons.py,
 # one at a time - the owner, 2026-11-15). Each is the vanilla Steel record of its type with the vanilla Skyforge uplift
-# the game gives its one-handed Skyforge weapons over Steel (sword and war axe: damage +3, value +25, weight unchanged),
+# the game gives its Skyforge weapons over Steel (one-handed - sword, war axe: damage +3, value +25; two-handed -
+# greatsword: damage +3, value +50; weight unchanged),
 # critical damage half the damage rounded down (the game's own rule on the Steel and Skyforge swords). A new first-person
 # static (vanilla's are shared with the Steel weapons), forged at the Skyforge with Steel Smithing from the vanilla Steel
 # recipe's ingredients, tempered with the vanilla Skyforge war axe's recipe.
-#   our EDID: (name, vanilla template WEAP, its recipe, 3rd-person mesh, 1st-person mesh, template 1st-person STAT)
+#   our EDID: (name, vanilla template WEAP, its recipe, 3rd-person mesh, 1st-person mesh, template 1st-person STAT, uplift)
 NEW_WEAPONS = {
     "SkyforgeSteelMace": ("Skyforge Steel Mace", "SteelMace", "RecipeWeaponSteelMace", "Mace.nif", "1stPersonMace.nif",
-                          "1stPersonSteelMace"),
+                          "1stPersonSteelMace", "one-handed"),
+    "SkyforgeSteelWarhammer": ("Skyforge Steel Warhammer", "SteelWarhammer", "RecipeWeaponSteelWarhammer", "Warhammer.nif",
+                               "1stPersonWarhammer.nif", "1stPersonSteelWarhammer", "two-handed"),
 }
-SKYFORGE_UPLIFT = {"damage": 3, "value": 25}
+SKYFORGE_UPLIFT = {"one-handed": {"damage": 3, "value": 25}, "two-handed": {"damage": 3, "value": 50}}
 NEW_WEAPON_TEMPER = "TemperWeaponSkyforgeSteelWarAxe"
 
 # the armour set: (our EDID, display name, vanilla template ARMO, LoY addon EDIDs, LoY ground mesh,
@@ -378,7 +381,7 @@ def main():
 
     # ---- 5. new weapon types: vanilla Steel bodies + the Skyforge uplift, own first-person static, forge and temper
     new_weapon_meshes = []
-    for our_edid, (full, template, recipe, mesh3, mesh1, stat_template) in NEW_WEAPONS.items():
+    for our_edid, (full, template, recipe, mesh3, mesh1, stat_template, hands) in NEW_WEAPONS.items():
         st = skyrim.get(stat_template)
         stat_edid = "1stPerson" + our_edid
         stat_fid = allot(stat_edid)
@@ -415,7 +418,7 @@ def main():
                 v = struct.pack("<I", stat_fid)
             elif s == b"DATA":
                 val, wt, dmg = struct.unpack_from("<IfH", v)
-                dmg += SKYFORGE_UPLIFT["damage"]; val += SKYFORGE_UPLIFT["value"]
+                dmg += SKYFORGE_UPLIFT[hands]["damage"]; val += SKYFORGE_UPLIFT[hands]["value"]
                 v = struct.pack("<IfH", val, wt, dmg) + v[10:]
                 new_dmg = dmg
             elif s == b"CRDT":

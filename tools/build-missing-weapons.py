@@ -4,7 +4,8 @@ Nordic Ebony Armor and Weapons Replacer gained in 1.1.0 (mace, warhammer, bow, a
 (the owner, 2026-11-15: "start building the other weapon types that we haven't built yet. Just do them one at a time").
 
 BUILT SO FAR
-    mace  ->  meshes\NordicSkyforge\weapons\Mace.nif and 1stPersonMace.nif
+    mace       ->  meshes\NordicSkyforge\weapons\Mace.nif and 1stPersonMace.nif       (missing_weapons\stage_mace.py)
+    warhammer  ->  meshes\NordicSkyforge\weapons\Warhammer.nif and 1stPersonWarhammer.nif (missing_weapons\stage_warhammer.py)
 
 WHERE THE ART COMES FROM
     Every piece is cut from NordwarUA's own STEEL Wolf war axe (Legacy of Ysgramor, Nexus 109963 - modification and
@@ -40,10 +41,18 @@ MW = os.path.join(HERE, "missing_weapons")
 sys.path.insert(0, MW)
 
 MESH_DIR = ("NordicSkyforge", "weapons")
-# built file -> (vanilla file it is built on, the vanilla main shape's name - verify's "ours")
-OUTPUTS = {"Mace.nif": ("ebonymace.nif", "EbonyMace:0"), "1stPersonMace.nif": ("1stpersonebonymace.nif", "1stPersonEbonyMace:0")}
-LOY_AXE = "Axe.nif"                  # Legacy of Ysgramor's steel war axe (meshes\NordWar\Companions\Weapons\)
-LOY_SHADER = {"axe1h": (LOY_AXE, "Axe2")}     # atlas -> (LoY file, the shape whose shader and texture set the mace takes)
+# item -> its Blender stage, the Legacy of Ysgramor steel weapon it is cut from (and the env var the stage reads it from),
+# the vanilla ebony NIFs it is built on, and the built files: {our file: (vanilla file, vanilla main shape - verify's "ours")}
+ITEMS = {
+    "mace": {"stage": "stage_mace.py", "loy": "Axe.nif", "env": "NSAW_AXE", "van_env": "NSAW_VAN_MACE",
+             "outputs": {"Mace.nif": ("ebonymace.nif", "EbonyMace:0"),
+                         "1stPersonMace.nif": ("1stpersonebonymace.nif", "1stPersonEbonyMace:0")}},
+    "warhammer": {"stage": "stage_warhammer.py", "loy": "BattleAxe.nif", "env": "NSAW_BAXE", "van_env": "NSAW_VAN_WARHAMMER",
+                  "outputs": {"Warhammer.nif": ("ebonywarhammer.nif", "EbonyWarhammer:0"),
+                              "1stPersonWarhammer.nif": ("1stpersonebonywarhammer.nif", "1stPersonEbonyWarhammer:0")}},
+}
+# atlas -> (LoY file, the shape whose shader and texture set the built shape takes)
+LOY_SHADER = {"axe1h": ("Axe.nif", "Axe2"), "axe2h": ("BattleAxe.nif", "BattleAxe2")}
 
 
 def fail(msg):
@@ -95,28 +104,28 @@ def sevenzip():
     fail("7-Zip not found")
 
 
-def loy_axe(work):
+def loy_weapons(work):
     dl = downloads()
     arc = [f for f in sorted(os.listdir(dl)) if "main archive se-109963" in f.lower() and f.lower().endswith(".7z")]
     if not arc:
         fail("no 'Main Archive SE-109963' in %s - download Legacy of Ysgramor's main file from Nexus first" % dl)
-    tmp = os.path.join(work, "loy_x")
-    p = subprocess.run([sevenzip(), "x", "-y", "-o" + tmp, os.path.join(dl, arc[-1]), "-ir!*Companions\\Weapons\\" + LOY_AXE],
-                       capture_output=True, text=True)
-    if p.returncode != 0:
-        fail("7-Zip failed on %s:\n%s" % (arc[-1], p.stdout + p.stderr))
-    hits = [os.path.join(dp, fn) for dp, _, fns in os.walk(tmp) for fn in fns
-            if fn.lower() == LOY_AXE.lower() and dp.lower().endswith(os.path.join("companions", "weapons"))]
-    if len(hits) != 1:
-        fail("Legacy of Ysgramor's archive has %d copies of Companions\\Weapons\\%s - its layout has changed" % (len(hits), LOY_AXE))
-    out = os.path.join(work, "loy"); os.makedirs(out, exist_ok=True)
-    shutil.copy2(hits[0], os.path.join(out, LOY_AXE))
+    tmp = os.path.join(work, "loy_x"); out = os.path.join(work, "loy"); os.makedirs(out, exist_ok=True)
+    for name in sorted({it["loy"] for it in ITEMS.values()}):
+        p = subprocess.run([sevenzip(), "x", "-y", "-o" + tmp, os.path.join(dl, arc[-1]), "-ir!*Companions\\Weapons\\" + name],
+                           capture_output=True, text=True)
+        if p.returncode != 0:
+            fail("7-Zip failed on %s:\n%s" % (arc[-1], p.stdout + p.stderr))
+        hits = [os.path.join(dp, fn) for dp, _, fns in os.walk(tmp) for fn in fns
+                if fn.lower() == name.lower() and dp.lower().endswith(os.path.join("companions", "weapons"))]
+        if len(hits) != 1:
+            fail("Legacy of Ysgramor's archive has %d copies of Companions\\Weapons\\%s - its layout has changed" % (len(hits), name))
+        shutil.copy2(hits[0], os.path.join(out, name))
     return out
 
 
 def vanilla_meshes(work):
     import bsa
-    data = game_data(); want = ["meshes\\weapons\\ebony\\" + v for v, _ in OUTPUTS.values()]; got = {}
+    data = game_data(); want = ["meshes\\weapons\\ebony\\" + v for it in ITEMS.values() for v, _ in it["outputs"].values()]; got = {}
     for name in ("Skyrim - Meshes0.bsa", "Skyrim - Meshes1.bsa"):
         p = os.path.join(data, name)
         if not os.path.isfile(p):
@@ -134,50 +143,62 @@ def vanilla_meshes(work):
     return root
 
 
-def main(out_meshes, work=None):
+def build_item(item, spec, loy, van, work, out_dir):
+    import assemble, verify
+    bw = os.path.join(work, "blender_" + item)
+    first3 = [v for v, _ in spec["outputs"].values() if not v.startswith("1stperson")][0]
+    first1 = [v for v, _ in spec["outputs"].values() if v.startswith("1stperson")][0]
+    env = dict(os.environ, NSAW_WORK=bw, **{spec["env"]: os.path.join(loy, spec["loy"]), spec["van_env"]: os.path.join(van, first3)})
+    log = os.path.join(work, "blender_%s.log" % item)
+    with open(log, "w", encoding="utf-8") as lf:
+        r = subprocess.run([blender(), "--background", "--factory-startup", "--python-exit-code", "1", "--python",
+                            os.path.join(MW, spec["stage"])], env=env, stdout=lf, stderr=subprocess.STDOUT, cwd=MW)
+    if r.returncode != 0:
+        tail = open(log, encoding="utf-8", errors="replace").read()[-3000:]
+        fail("the Blender stage for the %s failed (log %s):\n%s" % (item, log, tail))
+    stage = json.load(open(os.path.join(bw, "stage_report.json")))
+    assemble.LOY_SHADER = LOY_SHADER
+    shapes = os.path.join(bw, "shapes"); split = stage["head_split_y"][item]
+    off = assemble.first_person_offset(os.path.join(van, first3), os.path.join(van, first1))
+    rep = {"stage": stage, "assemble": {}, "verify": {}}
+    for out_name, (van_name, _) in spec["outputs"].items():
+        rep["assemble"][out_name] = assemble.build_static(item, os.path.join(van, van_name), os.path.join(out_dir, out_name),
+                                                          shapes, loy, split, [0, 0, 0] if van_name == first3 else off)
+    faults = 0
+    for out_name, (van_name, ours) in spec["outputs"].items():
+        v = verify.check(os.path.join(out_dir, out_name), os.path.join(van, van_name), {ours})
+        rep["verify"][out_name] = v; faults += len(v["faults"])
+    return rep, faults
+
+
+def main(out_meshes, work=None, only=None):
     work = work or os.path.join(os.path.dirname(os.path.abspath(out_meshes)), "_work_missing_weapons")
     if os.path.isdir(work):
         shutil.rmtree(work)
     os.makedirs(work)
-    loy = loy_axe(work); van = vanilla_meshes(work)
-    bw = os.path.join(work, "blender")
-    env = dict(os.environ, NSAW_AXE=os.path.join(loy, LOY_AXE), NSAW_VAN_MACE=os.path.join(van, "ebonymace.nif"), NSAW_WORK=bw)
-    log = os.path.join(work, "blender.log")
-    with open(log, "w", encoding="utf-8") as lf:
-        r = subprocess.run([blender(), "--background", "--factory-startup", "--python-exit-code", "1", "--python",
-                            os.path.join(MW, "stage_mace.py")], env=env, stdout=lf, stderr=subprocess.STDOUT, cwd=MW)
-    if r.returncode != 0:
-        tail = open(log, encoding="utf-8", errors="replace").read()[-3000:]
-        fail("the Blender stage failed (log %s):\n%s" % (log, tail))
-    stage = json.load(open(os.path.join(bw, "stage_report.json")))
-    import assemble, verify
-    assemble.LOY_SHADER = LOY_SHADER
+    loy = loy_weapons(work); van = vanilla_meshes(work)
     out_dir = os.path.join(out_meshes, *MESH_DIR)
-    shapes = os.path.join(bw, "shapes"); split = stage["head_split_y"]["mace"]
-    off = assemble.first_person_offset(os.path.join(van, "ebonymace.nif"), os.path.join(van, "1stpersonebonymace.nif"))
-    rep = {"stage": stage, "assemble": {}, "verify": {}}
-    for out_name, (van_name, _) in OUTPUTS.items():
-        rep["assemble"][out_name] = assemble.build_static("mace", os.path.join(van, van_name), os.path.join(out_dir, out_name),
-                                                          shapes, loy, split, [0, 0, 0] if van_name == "ebonymace.nif" else off)
-    faults = 0
-    for out_name, (van_name, ours) in OUTPUTS.items():
-        v = verify.check(os.path.join(out_dir, out_name), os.path.join(van, van_name), {ours})
-        rep["verify"][out_name] = v; faults += len(v["faults"])
+    rep, faults, outputs = {}, 0, []
+    for item, spec in ITEMS.items():
+        if only and item not in only:
+            continue
+        rep[item], f = build_item(item, spec, loy, van, work, out_dir); faults += f; outputs += list(spec["outputs"])
     json.dump(rep, open(os.path.join(work, "build_report.json"), "w"), indent=1, default=str)
-    missing = [f for f in OUTPUTS if not os.path.isfile(os.path.join(out_dir, f))]
+    missing = [f for f in outputs if not os.path.isfile(os.path.join(out_dir, f))]
     if missing:
         fail("not built: %s" % missing)
     if faults:
         fail("%d verification fault(s) - see %s" % (faults, os.path.join(work, "build_report.json")))
-    st = {k: v["see_through_share"] for k, v in rep["verify"].items()}
+    st = {k: v["see_through_share"] for r in rep.values() for k, v in r["verify"].items()}
     print("missing weapons built: %d files in %s (light-through, reported: %s; report %s)"
-          % (len(OUTPUTS), out_dir, st, os.path.join(work, "build_report.json")))
+          % (len(outputs), out_dir, st, os.path.join(work, "build_report.json")))
     return out_dir, rep
 
 
 if __name__ == "__main__":
     a = sys.argv[1:]
     if not a:
-        fail("usage: build-missing-weapons.py <output meshes folder> [--work <folder>]")
+        fail("usage: build-missing-weapons.py <output meshes folder> [--work <folder>] [--only mace,warhammer]")
     w = a[a.index("--work") + 1] if "--work" in a else None
-    main(a[0], w)
+    o = a[a.index("--only") + 1].split(",") if "--only" in a else None
+    main(a[0], w, o)

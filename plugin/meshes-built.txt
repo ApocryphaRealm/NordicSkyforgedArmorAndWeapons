@@ -1,2 +1,4 @@
 NordicSkyforge\weapons\Mace.nif
 NordicSkyforge\weapons\1stPersonMace.nif
+NordicSkyforge\weapons\Warhammer.nif
+NordicSkyforge\weapons\1stPersonWarhammer.nif
