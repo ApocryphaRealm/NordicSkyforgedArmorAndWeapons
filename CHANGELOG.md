@@ -1,5 +1,10 @@
 # Changelog - Truly Nordic Skyforged Armor and Weapons
 
+## 1.0.1 - 2026-11-16 - untested
+
+### Fixed
+- The five Skyforge Steel weapons (sword, dagger, greatsword, war axe, battleaxe) can now be forged and tempered at the Skyforge. They are the game's own Skyforge Steel records with new models, and the game gives them no forge recipe (Eorlund sells them), so they could not be crafted and players could not find them. Each now has a Skyforge recipe at the Skyforge with Steel Smithing, using the game's own Steel recipe of its type: sword 2 steel ingots, 1 iron ingot, 1 leather strips; dagger 1 steel ingot, 1 iron ingot, 1 leather strips; greatsword 4 steel ingots, 2 iron ingots, 3 leather strips; war axe 2 steel ingots, 1 iron ingot, 2 leather strips; battleaxe 4 steel ingots, 1 iron ingot, 2 leather strips. They temper at a grindstone with a steel ingot - the sword, greatsword, war axe and battleaxe through the game's own tempering recipes, the dagger (which the game never gave one) through a new one like the mace's. Six new records, added after every 1.0.0 record (0x82B-0x830); no earlier FormID moves.
+
 ## 1.0.0 - 2026-11-16 - untested
 
 First public release, under the new name Truly Nordic Skyforged Armor and Weapons (it was Nordic Skyforged Armor and

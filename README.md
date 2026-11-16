@@ -3,7 +3,7 @@
 NordwarUA's steel Wolf weapons from **Legacy of Ysgramor** on the five Skyforge Steel weapons, plus a Skyforge Steel
 armour set made from his steel Wolf armour, all black - his own textures recoloured - in **TruePBR**. Legacy of
 Ysgramor has no **mace, warhammer, bow, arrows or quiver** for this set, so those are assembled from pieces of his steel
-weapons. The armour and the new weapons are forged at the Skyforge. (Named Nordic Skyforged Armor and Weapons while in
+weapons. The armour and every weapon, the five Skyforge Steel weapons included, are forged at the Skyforge. (Named Nordic Skyforged Armor and Weapons while in
 development.)
 
 ## Two downloads

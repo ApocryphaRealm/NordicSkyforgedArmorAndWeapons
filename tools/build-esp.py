@@ -10,6 +10,7 @@ WHAT THE PLUGIN DOES
        Everything else about those records - damage, value, keywords, sounds - stays vanilla,
        because the body is copied from Skyrim.esm and only MODL changes - and, since the 2026-11-15 build, WNAM, which
        names each weapon's own first-person static (section 7) instead of vanilla Steel's shared one.
+       Since 1.0.1 they are also forged at the Skyforge (section 7b): vanilla gives them no forge recipe.
 
     2. ADDS a Skyforge Steel armour set - cuirass, boots, gauntlets, helmet and shield - built
        from the steel wolf armour of the same mod (the fur-collared cuirass). The stats are the
@@ -64,6 +65,7 @@ FIRST_NEW = 0x800
 # ---- vanilla FormIDs (Skyrim.esm), by name so the intent is readable
 K_SKYFORGE = 0x000F46CE       # CraftingSmithingSkyforge
 K_ARMOR_TABLE = 0x000ADB78    # CraftingSmithingArmorTable
+K_GRINDSTONE = 0x00088108     # CraftingSmithingSharpeningWheel
 PERK_STEEL = 0x000CB40D       # SteelSmithing
 INGOT_STEEL = 0x0005ACE5
 LEATHER_STRIPS = 0x000800E4
@@ -81,6 +83,14 @@ WEAPONS = {
     "SkyforgeSteelWarAxe": ("Axe.nif", "Skyforge Steel War Axe"),
     "SkyforgeSteelBattleaxe": ("BattleAxe.nif", "Skyforge Steel Battleaxe"),
     "SkyforgeSteelDagger": ("Dagger.nif", "Skyforge Steel Dagger"),
+}
+# the vanilla Steel recipe each replaced weapon's Skyforge recipe is copied from (section 7b, 1.0.1)
+REPLACED_WEAPON_RECIPE = {
+    "SkyforgeSteelSword": "RecipeWeaponSteelSword",
+    "SkyforgeSteelGreatsword": "RecipeWeaponSteelGreatsword",
+    "SkyforgeSteelWarAxe": "RecipeWeaponSteelWarAxe",
+    "SkyforgeSteelBattleaxe": "RecipeWeaponSteelBattleAxe",
+    "SkyforgeSteelDagger": "RecipeWeaponSteelDagger",
 }
 
 # NEW Skyforge Steel weapons of the types the game has no Skyforge version of (built by tools/build-missing-weapons.py,
@@ -657,6 +667,58 @@ def main():
         records.append(("STAT", stat_fid, st["ver"], ssubs, hdr(st)))
         subs[wi[0]] = (b"WNAM", struct.pack("<I", stat_fid))
         new_weapon_meshes.append(mesh1)
+
+    # ---- 7b. forge recipes for the five replaced weapons (1.0.1, 2026-11-16): Skyrim.esm has none (Eorlund sells them),
+    # so players could not find the swords at the Skyforge. Each is the vanilla Steel recipe of its type - its ingredients
+    # and its Steel Smithing condition - with the created object and the workbench swapped, the way the mace's is made.
+    # Tempering: Skyrim.esm already tempers four of them at the grindstone (TemperWeaponSkyforgeSteel*); a second recipe
+    # for the same item is not added. The one it lacks (the dagger) gets the Skyforge war axe's, as the mace does.
+    # Allotted after section 7, so every 1.0.0 FormID stays where it was.
+    vanilla_tempered = set()
+    for r in skyrim.by_fid.values():
+        if r["type"] != "COBJ":
+            continue
+        bn = [v for s, v in r["subs"] if s == b"BNAM"]
+        cn = [v for s, v in r["subs"] if s == b"CNAM"]
+        if bn and cn and struct.unpack("<I", bn[0])[0] == K_GRINDSTONE:
+            vanilla_tempered.add(struct.unpack("<I", cn[0])[0])
+    for edid in WEAPONS:
+        wfid = skyrim.get(edid)["fid"]
+        rc = skyrim.get(REPLACED_WEAPON_RECIPE[edid])
+        rfid = allot("Recipe" + edid)
+        subs = []
+        for s, v in rc["subs"]:
+            if s == b"EDID":
+                v = ("Recipe" + edid).encode("latin-1") + b"\x00"
+            elif s == b"CNAM":
+                v = struct.pack("<I", wfid)
+            elif s == b"BNAM":
+                v = struct.pack("<I", K_SKYFORGE)
+            subs.append((s, v))
+        check_refs("COBJ", subs, sky_ix, "Recipe" + edid)
+        records.append(("COBJ", rfid, rc["ver"], subs, hdr(rc)))
+        if wfid in vanilla_tempered:
+            continue
+        tc = skyrim.get(NEW_WEAPON_TEMPER)
+        tfid = allot("Temper" + edid)
+        subs = []
+        for s, v in tc["subs"]:
+            if s == b"EDID":
+                v = ("Temper" + edid).encode("latin-1") + b"\x00"
+            elif s == b"CNAM":
+                v = struct.pack("<I", wfid)
+            subs.append((s, v))
+        check_refs("COBJ", subs, sky_ix, "Temper" + edid)
+        records.append(("COBJ", tfid, tc["ver"], subs, hdr(tc)))
+    for edid in WEAPONS:
+        wfid = skyrim.get(edid)["fid"]
+        if not any(r[0] == "COBJ" and (b"CNAM", struct.pack("<I", wfid)) in r[3]
+                   and (b"BNAM", struct.pack("<I", K_SKYFORGE)) in r[3] for r in records):
+            fail("%s has no Skyforge recipe" % edid)
+        if wfid not in vanilla_tempered and not any(
+                r[0] == "COBJ" and (b"CNAM", struct.pack("<I", wfid)) in r[3]
+                and (b"BNAM", struct.pack("<I", K_GRINDSTONE)) in r[3] for r in records):
+            fail("%s has no temper recipe" % edid)
 
     # ---- 8. object bounds (fixed before the first public release): every item carries real OBND. A template with all-zero bounds (Legacy of
     # Ysgramor's NW_Wolf_Shield_Steel, copied for the shield) gets them computed from the item's own ground model as it
