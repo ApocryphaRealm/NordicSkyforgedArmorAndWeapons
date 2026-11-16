@@ -7,7 +7,8 @@ WHAT THIS PACKAGES
     tools/recolour_black.py (the owner, 2026-11-15 21:54: Xtudo's colourway needs his permission, so
     none of his files is read or shipped) - as Community Shaders TRUEPBR materials (the owner 21:55;
     tools/truepbr.py), one texture set in the core (NordwarUA ships one resolution), plus the light
-    plugin from build-esp.py. Body option: the CBBE 3BA BodySlide files only (HIMBO dropped).
+    plugin from build-esp.py. Body options (2026-11-16, loy-refits.py + body_fits.py): CBBE 3BA on our own slider
+    data and our own HIMBO fit, meshes prebuilt by BodySlide plus the projects; vanilla is the default.
 
 WHY THE MESHES ARE REWRITTEN
     The meshes name their textures under textures\NordWar\Companions\ - Legacy of Ysgramor's own
