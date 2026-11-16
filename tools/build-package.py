@@ -230,7 +230,33 @@ def main(out_root=None, test=False):
             os.makedirs(os.path.dirname(d), exist_ok=True)
             open(d, "wb").write(new)
             shipped.append(d)
-    shutil.copy2(plugin, core)
+    # The plugin is one side of the installer's required "Plugin" choice (the owner, 2026-11-16 02:43: an ESP and a
+    # no-ESP version using SkyPatcher). The other side, "02 Plugin - SkyPatcher", is the repo's skypatcher\ INIs. Only
+    # vanilla's five Skyforge Steel weapons can be done without a plugin (SkyPatcher cannot create records), and their
+    # world meshes are in the core either way.
+    esp_dir = os.path.join(out_root, "01 Plugin - ESP")
+    os.makedirs(esp_dir, exist_ok=True)
+    shutil.copy2(plugin, esp_dir)
+    sp_src = os.path.join(REPO, "skypatcher")
+    sp_dir = os.path.join(out_root, "02 Plugin - SkyPatcher", "SKSE", "Plugins", "SkyPatcher")
+    n_sp = 0
+    for dp, _, fs in os.walk(sp_src):
+        for f in fs:
+            if not f.lower().endswith(".ini"):
+                fail("skypatcher\\ holds '%s' - only .ini files go there" % f)
+            d = os.path.join(sp_dir, os.path.relpath(os.path.join(dp, f), sp_src))
+            os.makedirs(os.path.dirname(d), exist_ok=True)
+            shutil.copy2(os.path.join(dp, f), d)
+            n_sp += 1
+    ini = os.path.join(sp_dir, "weapon", "TrulyNordicSkyforged", "TrulyNordicSkyforged.ini")
+    if not os.path.isfile(ini):
+        fail("the no-ESP option has no weapon INI")
+    for m in re.findall(r"model=(NordicSkyforge\\[^\s:]+\.nif)", open(ini, encoding="utf-8").read()):
+        if not os.path.isfile(os.path.join(core, "meshes", m.replace("\\", os.sep))):
+            fail("the SkyPatcher INI names %s, which the core does not ship" % m)
+    for dp, _, fs in os.walk(os.path.join(out_root, "02 Plugin - SkyPatcher")):
+        if any(f.lower().endswith((".esp", ".esm", ".esl")) for f in fs):
+            fail("the no-ESP option holds a plugin")
 
     # ---- body option: CBBE 3BA BodySlide files (Xonek, Nexus 111209); see tools/loy-refits.py. Built before the
     # textures, because its shape data names the same materials and is converted to TruePBR with the rest.
@@ -302,7 +328,7 @@ def main(out_root=None, test=False):
     print("built %s" % out_root)
     print("  version ............... %s" % ver)
     print("  meshes ................ %d, texture paths rewritten to %s" % (len(shipped), NEW_TEX.decode()))
-    print("  plugin ................ %s" % PLUGIN)
+    print("  plugin ................ %s (option 01; option 02 is %d SkyPatcher INIs)" % (PLUGIN, n_sp))
     print("  TruePBR ............... %d materials, %d shaders in %d meshes converted, %d verified" % (len(mats), n_shaders, n_files, n_ok))
     print("  textures .............. %d (largest %d px), under textures\\pbr\\%s" % (n_tex, biggest, PBR_FOLDER))
     print("  installer sources ..... %d, every one present" % len(sources))
