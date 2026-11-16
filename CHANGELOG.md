@@ -26,6 +26,7 @@
 - The 1K / 2K / 4K texture choice: NordwarUA ships one resolution, so one texture set installs with the core.
 
 ### Fixed
+- The fur collar is a black-grey fur with visible strands again instead of a flat black shape.
 - Build: tools/build-package.py moved an existing package folder aside instead of deleting it (it used to delete it outright).
 
 ## 1.0.0
