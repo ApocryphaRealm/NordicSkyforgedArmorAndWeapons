@@ -14,8 +14,8 @@ BUILT SO FAR
 
 WHERE THE ART COMES FROM
     Every piece is cut from NordwarUA's own STEEL Wolf war axe (Legacy of Ysgramor, Nexus 109963 - modification and
-    asset use allowed with credit) and keeps its own UVs on that axe's atlas, which this mod already ships in Xtudo's
-    Wolf Black colourway. No new texture. The recipe is the Ebony replacer's approved mace (2026-11-14), re-mapped onto
+    asset use allowed with credit) and keeps its own UVs on that axe's atlas, which this mod already ships (our TruePBR
+    black recolour of it). No new texture. The recipe is the Ebony replacer's approved mace (2026-11-14), re-mapped onto
     the steel axe's parts - see missing_weapons\stage_mace.py. The repository carries no Legacy of Ysgramor art and no
     Bethesda art:
       * Legacy of Ysgramor's steel war axe is read out of its Nexus download at build time;

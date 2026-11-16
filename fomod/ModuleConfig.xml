@@ -4,55 +4,21 @@
 	<moduleName>Nordic Skyforged Armor and Weapons</moduleName>
 	<moduleImage path="fomod\images\header.png" showImage="true" showFade="true" height="-1" />
 
-	<!-- The meshes and the plugin are the same whatever you pick below, so they install once. -->
+	<!-- The meshes, the plugin and the TruePBR textures (our black recolour of NordwarUA's own maps; one set, as he
+	     ships one resolution) are the same whatever you pick below, so they install once. -->
 	<requiredInstallFiles>
 		<folder source="00 Core" destination="" priority="0" />
 	</requiredInstallFiles>
 
 	<installSteps order="Explicit">
-		<installStep name="Texture resolution">
-			<optionalFileGroups order="Explicit">
-				<group name="Texture resolution" type="SelectExactlyOne">
-					<plugins order="Explicit">
-						<plugin name="2K - recommended">
-							<description>Xtudo's black textures at 2K. What the set was authored around, and about 90 MB of VRAM less than 4K for a difference you will not see on a cuirass.</description>
-							<files><folder source="02 Textures - 2K" destination="" priority="1" /></files>
-							<typeDescriptor><type name="Recommended" /></typeDescriptor>
-						</plugin>
-						<plugin name="4K">
-							<description>The same textures at 4K. Worth it for close screenshots; otherwise it is VRAM for nothing.</description>
-							<files><folder source="03 Textures - 4K" destination="" priority="1" /></files>
-							<typeDescriptor><type name="Optional" /></typeDescriptor>
-						</plugin>
-						<plugin name="1K">
-							<description>The same textures at 1K, for a machine that is short of VRAM.</description>
-							<files><folder source="01 Textures - 1K" destination="" priority="1" /></files>
-							<typeDescriptor><type name="Optional" /></typeDescriptor>
-						</plugin>
-					</plugins>
-				</group>
-			</optionalFileGroups>
-		</installStep>
 		<installStep name="Body">
 			<optionalFileGroups order="Explicit">
 				<group name="Body support" type="SelectAny">
 					<plugins order="Explicit">
-						<plugin name="HIMBO - prebuilt male meshes">
-							<description>The cuirass, boots, gauntlets and first-person arms refitted to HIMBO (zeroed sliders, so OBody and its kind work out of the box), from Trexasle's Legacy of Ysgramor - HIMBO Conversion. Overrides the male meshes; the helmet has no body under it and is unchanged.</description>
-							<image path="fomod\images\himbo.png" />
-							<files><folder source="30 HIMBO meshes" destination="" priority="2" /></files>
-							<typeDescriptor><type name="Optional" /></typeDescriptor>
-						</plugin>
-						<plugin name="HIMBO - BodySlide files">
-							<description>Slider sets and shape data to build the male set to your own HIMBO preset in BodySlide, under the group "Nordic Skyforged - HIMBO".</description>
-							<image path="fomod\images\himbo.png" />
-							<files><folder source="31 BodySlide - HIMBO" destination="" priority="2" /></files>
-							<typeDescriptor><type name="Optional" /></typeDescriptor>
-						</plugin>
 						<plugin name="CBBE 3BA - BodySlide files">
-							<description>Slider sets and shape data to build the female set to your CBBE 3BA preset in BodySlide (no physics), from Xonek's Legacy of Ysgramor - 3BA Bodyslide, under the group "Nordic Skyforged - CBBE 3BA". Nothing is prebuilt: build them once in BodySlide.</description>
+							<description>Slider sets and shape data to build the female set to your CBBE 3BA preset in BodySlide (no physics), from Xonek's Legacy of Ysgramor - 3BA Bodyslide (permissions as Legacy of Ysgramor's), under the group "Nordic Skyforged - CBBE 3BA". Nothing is prebuilt: build them once in BodySlide.</description>
 							<image path="fomod\images\cbbe3ba.png" />
-							<files><folder source="32 BodySlide - CBBE 3BA" destination="" priority="2" /></files>
+							<files><folder source="30 BodySlide - CBBE 3BA" destination="" priority="2" /></files>
 							<typeDescriptor><type name="Optional" /></typeDescriptor>
 						</plugin>
 					</plugins>

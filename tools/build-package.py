@@ -3,8 +3,11 @@ r"""Assemble the FOMOD package for Nordic Skyforged Armor and Weapons.
 
 WHAT THIS PACKAGES
     NordwarUA's steel wolf armour and weapons from Legacy of Ysgramor (Nexus 109963), under this
-    mod's own folders, in Xtudo's black colourway from Nexus 111121 (Wolf Black for the straps and
-    cloth, Full Collar Black for the fur), plus the light plugin from build-esp.py.
+    mod's own folders, in an all-black look of our own - NordwarUA's ORIGINAL diffuses recoloured by
+    tools/recolour_black.py (the owner, 2026-11-15 21:54: Xtudo's colourway needs his permission, so
+    none of his files is read or shipped) - as Community Shaders TRUEPBR materials (the owner 21:55;
+    tools/truepbr.py), one texture set in the core (NordwarUA ships one resolution), plus the light
+    plugin from build-esp.py. Body option: the CBBE 3BA BodySlide files only (HIMBO dropped).
 
 WHY THE MESHES ARE REWRITTEN
     The meshes name their textures under textures\NordWar\Companions\ - Legacy of Ysgramor's own
@@ -30,6 +33,7 @@ Usage:  python tools/build-package.py [output folder] [--test]
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -41,10 +45,8 @@ SEVENZIP = [r"C:\Program Files\7-Zip\7z.exe", r"C:\Program Files (x86)\7-Zip\7z.
 
 A_BASE = "Main Archive SE-109963"              # NordwarUA - meshes, normals, masks, steel diffuses
 A_FURFIX = "Patch Fur Lighting Bug-109963"     # NordwarUA - corrected FurCollar_n
-A_COLLAR = "Color - Full Collar Black-111121"  # Xtudo - the black fur collar
-A_WOLF = {"1K": "Color - Wolf Black 1K-111121",
-          "2K": "Color - Wolf Black 2K-111121",
-          "4K": "Color - Wolf Black 4K-111121"}
+PBR_FOLDER = "NordicSkyforge"                 # textures\pbr\NordicSkyforge\
+MAX_DDS = 2048
 
 PLUGIN = "Nordic Skyforged Armor and Weapons.esp"
 SRC_MESH = "meshes/NordWar/Companions"
@@ -54,7 +56,34 @@ assert len(OLD_TEX) == len(NEW_TEX)
 TEX_RE = re.compile(rb"textures[\\/]NordWar[\\/]Companions[\\/]", re.IGNORECASE)
 TEXPAT = re.compile(rb"[Tt]extures.{1,180}?\.dds")
 VANILLA_TEXTURES = ("textures\\blood\\", "textures\\cubemaps\\")
-IMAGES = ("header.png", "himbo.png", "cbbe3ba.png")   # rendered from a built package by tools/installer-images.py
+IMAGES = ("header.png", "cbbe3ba.png")   # rendered from a built package by tools/installer-images.py
+
+
+def supersede(folder):
+    """NEVER DELETE A PACKAGE (2026-10-25): the package folder this build replaces is MOVED to
+    <project>/_work/superseded-packages/<date>/ - <project> being the nearest folder above it that has a _work folder
+    (SUPERSEDED_PACKAGES_DIR overrides; with neither, a _superseded folder beside it) - and stays there until someone
+    clears it by hand. This script used to shutil.rmtree it."""
+    import time
+    root = os.environ.get("SUPERSEDED_PACKAGES_DIR")
+    here = os.path.dirname(os.path.abspath(folder))
+    p = here
+    while not root:
+        if os.path.isdir(os.path.join(p, "_work")):
+            root = os.path.join(p, "_work", "superseded-packages")
+        elif os.path.dirname(p) == p:
+            root = os.path.join(here, "_superseded")
+        else:
+            p = os.path.dirname(p)
+    day = os.path.join(root, time.strftime("%Y-%m-%d"))
+    os.makedirs(day, exist_ok=True)
+    to = base = os.path.join(day, "%s (replaced %s)" % (os.path.basename(os.path.normpath(folder)), time.strftime("%H%M%S")))
+    i = 2
+    while os.path.exists(to):
+        to, i = "%s %d" % (base, i), i + 1
+    shutil.move(folder, to)
+    print("the package this build replaces was moved to %s (never deleted)" % to)
+    return to
 
 
 def fail(msg):
@@ -127,13 +156,11 @@ def main(out_root=None, test=False):
         out_root = os.path.normpath(os.path.join(REPO, "..", "..", "7. current test builds",
                                                  "Nordic Skyforged Armor and Weapons %s" % ver))
     if os.path.isdir(out_root):
-        shutil.rmtree(out_root)
+        supersede(out_root)     # never deleted (2026-10-25); this script used to shutil.rmtree it
     work = os.path.join(out_root, "_work")
 
     base = extract(A_BASE, os.path.join(work, "base"))
     furfix = extract(A_FURFIX, os.path.join(work, "furfix"))
-    collar = extract(A_COLLAR, os.path.join(work, "collar"))
-    wolf = {k: extract(v, os.path.join(work, "wolf" + k)) for k, v in A_WOLF.items()}
 
     plugin = os.path.join(REPO, "plugin", PLUGIN)
     needed = os.path.join(REPO, "plugin", "meshes-needed.txt")
@@ -205,49 +232,45 @@ def main(out_root=None, test=False):
             shipped.append(d)
     shutil.copy2(plugin, core)
 
-    # ---- textures, derived from the rewritten meshes; looked up under the ORIGINAL names
-    wanted = set()
-    for s in shipped:
-        for m in TEXPAT.findall(open(s, "rb").read()):
-            p = m.decode("latin-1").replace("/", "\\").lower()
-            if not any(p.startswith(v) for v in VANILLA_TEXTURES):
-                wanted.add(p)
-    new_prefix = NEW_TEX.decode().lower()
-    old_prefix = OLD_TEX.decode()
-
-    def sources_for(res):
-        return [collar, wolf[res], furfix, base]   # colour packs win over the base mod's own
-
-    n_tex = {}
-    for res in ("1K", "2K", "4K"):
-        dest = os.path.join(out_root, "0%d Textures - %s" % (1 + ("1K", "2K", "4K").index(res), res))
-        found = 0
-        for rel in sorted(wanted):
-            if not rel.startswith(new_prefix):
-                fail("shipped mesh still names '%s' outside this mod's texture folder" % rel)
-            orig = old_prefix + rel[len(new_prefix):]
-            src = None
-            for root in sources_for(res):
-                src = ci_find(root, orig)
-                if src:
-                    break
-            if src is None:
-                fail("a shipped mesh asks for '%s' and no source archive has it - in game that "
-                     "shape renders purple" % orig)
-            d = os.path.join(dest, rel.replace("\\", os.sep))
-            os.makedirs(os.path.dirname(d), exist_ok=True)
-            shutil.copy2(src, d)
-            found += 1
-        n_tex[res] = found
-
-    # ---- body options: HIMBO (prebuilt male meshes + BodySlide) and CBBE 3BA (BodySlide), from the
-    # two Legacy of Ysgramor refits on Nexus (110002, 111209); see tools/loy-refits.py
+    # ---- body option: CBBE 3BA BodySlide files (Xonek, Nexus 111209); see tools/loy-refits.py. Built before the
+    # textures, because its shape data names the same materials and is converted to TruePBR with the rest.
     r = subprocess.run([sys.executable, os.path.join(HERE, "loy-refits.py"), "--profile", "skyforged",
                         "--out", out_root, "--first", "30"], capture_output=True, text=True)
     if r.returncode != 0:
         fail("body options failed:\n" + (r.stdout + r.stderr).strip())
     for line in r.stdout.strip().splitlines():
         print(line)
+
+    # ---- textures: every material the shipped meshes use, found by reading them (never a hand list), made into our
+    # black recolour as TruePBR maps from NordwarUA's own files (looked up under his ORIGINAL names); then every shader
+    # of ours is converted (tools/truepbr.py). One set, in the core.
+    sys.path.insert(0, HERE)
+    import truepbr
+    old = (NEW_TEX.decode().lower(), OLD_TEX.decode().lower())
+    mesh_roots = [os.path.join(out_root, d) for d in sorted(os.listdir(out_root))
+                  if os.path.isdir(os.path.join(out_root, d)) and d[:2].isdigit()]
+    mats = truepbr.scan(mesh_roots, old)
+    if not mats:
+        fail("no shipped mesh names a texture of the set - the scan is looking in the wrong place")
+
+    def find_src(stem):
+        """NordwarUA's file by name: the Fur Lighting Bug patch's FurCollar_n wins over the main archive's"""
+        for root in (furfix, base):
+            p = ci_find(root, "textures/NordWar/Companions/%s.dds" % stem)
+            if p:
+                return p
+        return None
+    truepbr.build_textures(mats, find_src, "steel", PBR_FOLDER, core, os.path.join(work, "pbr"))
+    n_files, n_shaders = truepbr.convert(mesh_roots, old, PBR_FOLDER)
+    n_ok = truepbr.verify(mesh_roots, old, PBR_FOLDER, [core])
+    n_tex = 0; biggest = 0
+    for dp, _, fs in os.walk(os.path.join(core, "textures")):
+        for f in fs:
+            hdr = open(os.path.join(dp, f), "rb").read(20)
+            h, w = struct.unpack_from("<II", hdr, 12)
+            if hdr[:4] != b"DDS " or max(w, h) > MAX_DDS:
+                fail("'%s' is %dx%d - over 2K" % (f, w, h))
+            biggest = max(biggest, w, h); n_tex += 1
 
     # ---- fomod
     fomod = os.path.join(out_root, "fomod")
@@ -280,7 +303,8 @@ def main(out_root=None, test=False):
     print("  version ............... %s" % ver)
     print("  meshes ................ %d, texture paths rewritten to %s" % (len(shipped), NEW_TEX.decode()))
     print("  plugin ................ %s" % PLUGIN)
-    print("  textures per resolution %d  (1K/2K/4K)" % n_tex["2K"])
+    print("  TruePBR ............... %d materials, %d shaders in %d meshes converted, %d verified" % (len(mats), n_shaders, n_files, n_ok))
+    print("  textures .............. %d (largest %d px), under textures\\pbr\\%s" % (n_tex, biggest, PBR_FOLDER))
     print("  installer sources ..... %d, every one present" % len(sources))
     print("  files ................. %d" % total)
     return out_root
