@@ -26,6 +26,7 @@
 - The 1K / 2K / 4K texture choice: NordwarUA ships one resolution, so one texture set installs with the core.
 
 ### Fixed
+- The Skyforge Steel Shield now has object bounds, worked out from its model as it ships; it had none (zero, carried over from Legacy of Ysgramor's shield record), the likely reason Immersive Equipment Displays did not show it on your back when favourited and unequipped while the vanilla shields showed.
 - The fur collar is a black-grey fur with visible strands again instead of a flat black shape.
 - Build: tools/build-package.py moved an existing package folder aside instead of deleting it (it used to delete it outright).
 

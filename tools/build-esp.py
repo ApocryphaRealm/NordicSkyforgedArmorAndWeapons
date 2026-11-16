@@ -223,6 +223,61 @@ class Plugin(object):
         return rec
 
 
+# Ground models changed at packaging time, AFTER this script runs (tools/build-package.py copies Legacy of Ysgramor's
+# mesh into the package, then calls these on it). The bounds must describe the model as it ships, so the same step runs
+# here on a temporary copy. Keep this table and build-package.py's steps in step.
+def _resize_shield(path):
+    import sys
+    sys.path.insert(0, os.path.join(HERE, "missing_weapons"))
+    import shield_size
+    shield_size.resize(path)
+
+
+GROUND_MODEL_STEPS = {"nordicskyforge\\weapons\\shieldsteel.nif": _resize_shield}
+
+
+def ground_model_bounds(model, loy_meshes):
+    """OBND for an item whose template carries none (1.1.0: the Skyforge Steel Shield shipped 0,0,0 / 0,0,0 because
+    Legacy of Ysgramor's own shield record has zero bounds - with Immersive Equipment Displays the favourited shield did
+    not show on the back while the vanilla-record Ebony Shield did). Computed the way the Creation Kit does: the extents
+    of every vertex of every shape in the model's root frame, rounded outward to whole units (int16).
+    The model is our path (NordicSkyforge\\{armor|weapons}\\X.nif), read from Legacy of Ysgramor's mesh it is packaged
+    from, with any packaging step (GROUND_MODEL_STEPS) applied first to a temporary copy."""
+    import math
+    import shutil
+    import sys
+    import tempfile
+    sys.path.insert(0, os.path.join(HERE, "missing_weapons"))
+    import niflib
+    import shield_size
+    parts = model.replace("/", "\\").split("\\")
+    if len(parts) != 3 or parts[0].lower() != MESH_ROOT.lower():
+        fail("cannot compute bounds for '%s' - not one of Legacy of Ysgramor's meshes" % model)
+    rel = ["NordWar", "Companions"] + (["Weapons"] if parts[1].lower() == "weapons" else []) + [parts[2]]
+    src = loy_meshes
+    for seg in rel:
+        hit = [e for e in os.listdir(src) if e.lower() == seg.lower()] if os.path.isdir(src) else []
+        if not hit:
+            fail("cannot compute bounds for '%s': %s has no %s" % (model, src, seg))
+        src = os.path.join(src, hit[0])
+    tmp = tempfile.mkdtemp(prefix="nsaw-obnd-")
+    try:
+        work = os.path.join(tmp, parts[2])
+        shutil.copy2(src, work)
+        step = GROUND_MODEL_STEPS.get("\\".join(parts).lower())
+        if step:
+            step(work)
+        P = shield_size.world_points(niflib.Nif(work))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    lo = [int(math.floor(x)) for x in P.min(0)]
+    hi = [int(math.ceil(x)) for x in P.max(0)]
+    ob = lo + hi
+    if not all(-32768 <= x <= 32767 for x in ob) or not any(ob):
+        fail("bounds for '%s' are out of range or zero: %s" % (model, ob))
+    return ob
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out", nargs="?")
@@ -566,8 +621,35 @@ def main():
         subs[wi[0]] = (b"WNAM", struct.pack("<I", stat_fid))
         new_weapon_meshes.append(mesh1)
 
+    # ---- 8. object bounds (1.1.0 fix): every item carries real OBND. A template with all-zero bounds (Legacy of
+    # Ysgramor's NW_Wolf_Shield_Steel, copied for the shield) gets them computed from the item's own ground model as it
+    # ships; any item still at zero refuses the build. See ground_model_bounds.
+    loy_meshes = os.path.join(os.path.dirname(os.path.abspath(a.loy)), "meshes")
+    bounds_written = []
+    for rtype, fid, ver, subs in records:
+        if rtype not in ("ARMO", "WEAP", "AMMO"):
+            continue
+        edid = next(v.split(b"\x00")[0].decode("latin-1") for s, v in subs if s == b"EDID")
+        oi = [i for i, (s, v) in enumerate(subs) if s == b"OBND"]
+        if len(oi) != 1 or len(subs[oi[0]][1]) != 12:
+            fail("%s has no single 12-byte OBND" % edid)
+        if any(struct.unpack("<6h", subs[oi[0]][1])):
+            continue
+        model_sig = b"MOD2" if rtype == "ARMO" else b"MODL"     # ARMO's MODL is an addon FormID; its ground model is MOD2
+        model = next((v.split(b"\x00")[0].decode("latin-1") for s, v in subs if s == model_sig), None)
+        if not model:
+            fail("%s has all-zero OBND and no ground model to compute them from" % edid)
+        ob = ground_model_bounds(model, loy_meshes)
+        subs[oi[0]] = (b"OBND", struct.pack("<6h", *ob))
+        bounds_written.append((edid, model, ob))
+    for rtype, fid, ver, subs in records:
+        if rtype in ("ARMO", "WEAP", "AMMO"):
+            v = next(v for s, v in subs if s == b"OBND")
+            if not any(struct.unpack("<6h", v)):
+                fail("%08X (%s) would ship with all-zero OBND" % (fid, rtype))
+
     # ---- emit, one group per type
-    order = ["ARMA", "ARMO", "STAT", "PROJ", "WEAP", "AMMO", "COBJ"]
+    order =["ARMA", "ARMO", "STAT", "PROJ", "WEAP", "AMMO", "COBJ"]
     groups = bytearray()
     counts = {}
     for rtype in order:
@@ -611,6 +693,9 @@ def main():
     print("  new weapon types ...... %d (%s), built meshes %d (plugin/meshes-built.txt)"
           % (len(NEW_WEAPONS), ", ".join(NEW_WEAPONS), len(new_weapon_meshes)))
     print("  meshes the package owes  %d (plugin/meshes-needed.txt)" % (len(meshes_needed) + len(WEAPONS)))
+    for edid, model, ob in bounds_written:
+        print("  bounds computed ....... %s from %s%s: %d,%d,%d / %d,%d,%d" % (
+            (edid, model, " (as packaged)" if model.replace("/", "\\").lower() in GROUND_MODEL_STEPS else "") + tuple(ob)))
     print("  light flag ............ set")
 
 
