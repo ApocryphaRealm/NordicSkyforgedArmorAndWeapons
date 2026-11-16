@@ -1,6 +1,6 @@
 # Changelog - Nordic Skyforged Armor and Weapons
 
-## 1.1.0 - 2026-11-15 - untested
+## 1.1.0 - 2026-11-15 - working
 
 ### Added
 - A Skyforge Steel Bow - the Nordic Ebony replacer's bow (its approved design: the Wolf sword's blades bent into recurved limbs, a round braided collar at each end of the grip, round limb roots easing into the flat limb, one mounted claw per limb, the string's loops seated in notches at the tips, an arrow shelf, fitted to the vanilla bow rig and closed so no light shows through) on this set's own steel textures: the steel sword's for the limbs, grip, collars and claws, and the steel war axe's braided grip for the string. A new record (the game has no steel bow): the Imperial Bow, the game's steel-tier bow, with the two-handed Skyforge uplift - damage 12, value 140 - forged at the Skyforge with Steel Smithing from 3 steel ingots and 1 leather strips, tempered with a steel ingot; its first-person record uses the same model, as vanilla's bows do.
@@ -15,7 +15,9 @@
 - First-person models for the five Skyforge weapons the set already had (sword, greatsword, war axe, battleaxe, dagger): until now their first-person records were vanilla Steel's, so in first person they showed the vanilla steel weapons. Each now has its own first-person record on a first-person copy of its Legacy of Ysgramor model (the way the Nordic Ebony replacer made its first-person set, and the way Legacy of Ysgramor's own plugin does for these five weapons). The five new records are added after every 1.0.0 record, so no earlier FormID moves.
 
 ### Known
-- Untested in game: the mace, warhammer, bow and arrows in the hand, on the hip and back, in first person, the bow draw, arrows in flight, the quiver on the back (its six arrows disappearing as they are used) and at the Skyforge. Not yet in any levelled list or merchant - forged at the Skyforge only.
+- Not yet in any levelled list or merchant - forged at the Skyforge only.
+- Skyforge Immersion Addon closes the Skyforge's crafting menu ("The heat of the Skyforge is unbearable...") until The Silver Hand, Glory of the Dead or Missing in Action is complete, so with it installed these recipes (like every Skyforge recipe) wait for that point in the Companions questline; without it they are there from the start.
+- Mods that rescale every arrow (Archery Rebalance, for one) change the arrow's damage in game: its 13 shows as 11 there, as the vanilla Steel Arrow's 10 shows as 9.
 
 ## 1.0.0
 
