@@ -26,6 +26,7 @@
 - The 1K / 2K / 4K texture choice: NordwarUA ships one resolution, so one texture set installs with the core.
 
 ### Fixed
+- The Skyforge Steel Shield is now marked as a shield, as the game's own shields are, so shield-on-back mods such as Simple Dual Sheath put it on your back when it is sheathed instead of leaving it on your arm. Its worn model now also has a female version (the same model, as the vanilla shields have) and fits Draugr as the vanilla shields do.
 - The Skyforge Steel Shield now has object bounds, worked out from its model as it ships; it had none (zero, carried over from Legacy of Ysgramor's shield record), the likely reason Immersive Equipment Displays did not show it on your back when favourited and unequipped while the vanilla shields showed.
 - The fur collar is a black-grey fur with visible strands again instead of a flat black shape.
 - Build: tools/build-package.py moved an existing package folder aside instead of deleting it (it used to delete it outright).

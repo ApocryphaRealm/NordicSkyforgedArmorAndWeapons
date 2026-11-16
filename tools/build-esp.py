@@ -68,6 +68,8 @@ PERK_STEEL = 0x000CB40D       # SteelSmithing
 INGOT_STEEL = 0x0005ACE5
 LEATHER_STRIPS = 0x000800E4
 LEATHER = 0x000DB5D2
+RACE_DRAUGR = 0x00000D53
+RACE_DRAUGR_MAGIC = 0x000F71DC
 
 # vanilla weapon record -> LoY steel wolf mesh (under meshes\NordWar\Companions\Weapons\)
 # Skyrim.esm is a LOCALIZED master: its FULL and DESC are 4-byte string-table ids, not text.
@@ -158,6 +160,28 @@ def fail(msg):
     raise SystemExit("build-esp: " + msg)
 
 
+# Record-header flags are carried from each record's template (1.1.0 fix). Until then every record was written with
+# flags 0, so the Skyforge Steel Shield lost the ARMO "Shield" flag (0x40) that ArmorEbonyShield and Legacy of
+# Ysgramor's NW_Wolf_Shield_Steel carry; Simple Dual Sheath's shield-on-back reads it, and the owner saw our sheathed
+# shield stay on the arm while the Ebony Shield went to the back (2026-11-16). The compressed bit is dropped (we write
+# every record uncompressed); a template marked deleted or ignored is refused rather than copied.
+HDR_DELETED, HDR_IGNORED = 0x20, 0x1000
+ARMO_SHIELD = 0x40
+SLOT_39 = 1 << (39 - 30)        # BOD2/BODT body-slot bit for slot 39, the shield
+
+
+def hdr(rec):
+    f = rec["flags"] & ~COMPRESSED
+    if f & (HDR_DELETED | HDR_IGNORED):
+        fail("template %s (%08X) is marked deleted/ignored (flags %08X)" % (rec["edid"], rec["fid"], rec["flags"]))
+    return f
+
+
+def body_slots(subs):
+    v = next((v for s, v in subs if s in (b"BOD2", b"BODT")), None)
+    return struct.unpack_from("<I", v)[0] if v and len(v) >= 4 else 0
+
+
 def subrecords(data):
     i = 0
     while i + 6 <= len(data):
@@ -209,7 +233,7 @@ class Plugin(object):
                         body = zlib.decompress(body[4:])
                     subs = list(subrecords(body))
                     edid = next((v.split(b"\x00")[0].decode("latin-1") for s, v in subs if s == b"EDID"), "")
-                    rec = {"type": t.decode(), "fid": fid, "ver": ver, "subs": subs, "edid": edid}
+                    rec = {"type": t.decode(), "fid": fid, "ver": ver, "subs": subs, "edid": edid, "flags": flags}
                     self.by_fid[fid] = rec
                     if edid:
                         self.by_edid[edid] = rec
@@ -340,7 +364,7 @@ def main():
                 continue   # the texture-hash blob describes the old mesh; the game copes without it
             subs.append((s, v))
         check_refs("WEAP", subs, sky_ix, edid)
-        records.append(("WEAP", rec["fid"], rec["ver"], subs))
+        records.append(("WEAP", rec["fid"], rec["ver"], subs, hdr(rec)))
         replaced_weapons[edid] = subs        # WNAM repointed at the end (section 7), so 1.0.0's FormIDs stay put
 
     # ---- 2. the armour addons: LoY's bodies, models repointed, one per piece/race
@@ -373,8 +397,21 @@ def main():
                 elif s in (b"MO2T", b"MO3T", b"MO4T", b"MO5T"):
                     continue
                 subs.append((s, v))
+            if body_slots(subs) & SLOT_39:
+                # the shield addon, as the game's EbonyShieldAA has it: the same model as the FEMALE world model too
+                # (Legacy of Ysgramor's addon carries the male one only), and the two Draugr races among the additional
+                # races (its list stops at the playable races and their vampires).
+                if not any(s == b"MOD3" for s, v in subs):
+                    i = max(j for j, (s, v) in enumerate(subs) if s in (b"MOD2", b"MO2S"))
+                    subs.insert(i + 1, (b"MOD3", next(v for s, v in subs if s == b"MOD2")))
+                have = {struct.unpack("<I", v)[0] for s, v in subs if s == b"MODL"}
+                last = max(j for j, (s, v) in enumerate(subs) if s == b"MODL")
+                for race in (RACE_DRAUGR, RACE_DRAUGR_MAGIC):
+                    if race not in have:
+                        last += 1
+                        subs.insert(last, (b"MODL", struct.pack("<I", race)))
             check_refs("ARMA", subs, loy_ix, addon)
-            records.append(("ARMA", fid, src["ver"], subs))
+            records.append(("ARMA", fid, src["ver"], subs, hdr(src)))
 
     # ---- 3. the armour items: vanilla Wolf Armor bodies (LoY's for the shield), renamed and repointed
     armo_fid = {}
@@ -417,7 +454,7 @@ def main():
             fail("template %s has no MODL - nothing to point at our addons" % template)
         # a template with several addons but our piece listing more/less: MODL was rebuilt above
         check_refs("ARMO", subs, src_masters, our_edid)
-        records.append(("ARMO", fid, src["ver"], subs))
+        records.append(("ARMO", fid, src["ver"], subs, hdr(src)))
 
     # ---- 4. recipes: forge at the Skyforge, temper at the armour table
     def ctda_has_perk(perk):
@@ -439,7 +476,7 @@ def main():
                  (b"BNAM", struct.pack("<I", K_SKYFORGE)),
                  (b"NAM1", struct.pack("<H", 1))]
         check_refs("COBJ", subs, sky_ix, "Recipe" + our_edid)
-        records.append(("COBJ", fid, temper_ver, subs))
+        records.append(("COBJ", fid, temper_ver, subs, 0))         # written here, no template
         # temper: the vanilla Wolf Armor recipe with the created object swapped
         src = skyrim.get(TEMPER_TEMPLATE[our_edid])
         fid = allot("Temper" + our_edid)
@@ -451,7 +488,7 @@ def main():
                 v = struct.pack("<I", armo_fid[our_edid])
             subs.append((s, v))
         check_refs("COBJ", subs, sky_ix, "Temper" + our_edid)
-        records.append(("COBJ", fid, src["ver"], subs))
+        records.append(("COBJ", fid, src["ver"], subs, hdr(src)))
 
     # ---- 5. new weapon types: vanilla Steel bodies + the Skyforge uplift, own first-person static, forge and temper
     new_weapon_meshes = []
@@ -473,7 +510,7 @@ def main():
         if not any(s == b"MODL" for s, v in subs):
             fail("%s has no MODL" % stat_template)
         check_refs("STAT", subs, sky_ix, stat_edid)
-        records.append(("STAT", stat_fid, st["ver"], subs))
+        records.append(("STAT", stat_fid, st["ver"], subs, hdr(st)))
 
         src = skyrim.get(template)
         fid = allot(our_edid)
@@ -504,14 +541,14 @@ def main():
             if need not in seen:
                 fail("%s has no %s" % (template, need.decode()))
         check_refs("WEAP", subs, sky_ix, our_edid)
-        records.append(("WEAP", fid, src["ver"], subs))
+        records.append(("WEAP", fid, src["ver"], subs, hdr(src)))
         for m_ in dict.fromkeys(["%s\\weapons\\%s" % (MESH_ROOT, mesh3), "%s\\weapons\\%s" % (MESH_ROOT, mesh1)]):
             new_weapon_meshes.append(m_)
 
         # forge at the Skyforge: the vanilla Steel recipe, created object and workbench swapped (or written, see the bow)
         rfid = allot("Recipe" + our_edid)
         if isinstance(recipe, str):
-            rc = skyrim.get(recipe); rver = rc["ver"]
+            rc = skyrim.get(recipe); rver = rc["ver"]; rflags = hdr(rc)
             subs = []
             for s, v in rc["subs"]:
                 if s == b"EDID":
@@ -522,13 +559,13 @@ def main():
                     v = struct.pack("<I", K_SKYFORGE)
                 subs.append((s, v))
         else:
-            rver = temper_ver
+            rver = temper_ver; rflags = 0     # written here, no template
             subs = [(b"EDID", ("Recipe" + our_edid).encode("latin-1") + b"\x00"), (b"COCT", struct.pack("<I", len(recipe)))]
             subs += [(b"CNTO", struct.pack("<II", item, n_)) for item, n_ in recipe]
             subs += [(b"CTDA", ctda_has_perk(PERK_STEEL)), (b"CNAM", struct.pack("<I", fid)), (b"BNAM", struct.pack("<I", K_SKYFORGE)),
                      (b"NAM1", struct.pack("<H", 1))]
         check_refs("COBJ", subs, sky_ix, "Recipe" + our_edid)
-        records.append(("COBJ", rfid, rver, subs))
+        records.append(("COBJ", rfid, rver, subs, rflags))
         # temper: the vanilla Skyforge war axe's recipe with the created object swapped
         tc = skyrim.get(temper_template)
         tfid = allot("Temper" + our_edid)
@@ -540,7 +577,7 @@ def main():
                 v = struct.pack("<I", fid)
             subs.append((s, v))
         check_refs("COBJ", subs, sky_ix, "Temper" + our_edid)
-        records.append(("COBJ", tfid, tc["ver"], subs))
+        records.append(("COBJ", tfid, tc["ver"], subs, hdr(tc)))
 
     # ---- 6. new ammunition: the vanilla arrow + projectile, models swapped, Skyforge pattern, forged at the Skyforge
     for our_edid, (full, template, proj_template, mesh, flight, uplift, ingredients, count) in NEW_AMMO.items():
@@ -559,7 +596,7 @@ def main():
                 continue
             subs.append((s, v))
         check_refs("PROJ", subs, sky_ix, proj_edid)
-        records.append(("PROJ", proj_fid, pj["ver"], subs))
+        records.append(("PROJ", proj_fid, pj["ver"], subs, hdr(pj)))
         am = skyrim.get(template)
         fid = allot(our_edid)
         subs = []
@@ -579,7 +616,7 @@ def main():
                 v = struct.pack("<IIfI", proj_fid, flags, dmg + uplift["damage"], int(round(val * uplift["value_mult"]))) + v[16:]
             subs.append((s, v))
         check_refs("AMMO", subs, sky_ix, our_edid)
-        records.append(("AMMO", fid, am["ver"], subs))
+        records.append(("AMMO", fid, am["ver"], subs, hdr(am)))
         new_weapon_meshes += ["%s\\weapons\\%s" % (MESH_ROOT, mesh), "%s\\weapons\\%s" % (MESH_ROOT, flight)]
         for item, _ in ingredients:
             if item not in skyrim.by_fid:
@@ -590,7 +627,7 @@ def main():
         subs += [(b"CTDA", ctda_has_perk(PERK_STEEL)), (b"CNAM", struct.pack("<I", fid)), (b"BNAM", struct.pack("<I", K_SKYFORGE)),
                  (b"NAM1", struct.pack("<H", count))]
         check_refs("COBJ", subs, sky_ix, "Recipe" + our_edid)
-        records.append(("COBJ", rfid, temper_ver, subs))
+        records.append(("COBJ", rfid, temper_ver, subs, 0))       # written here, no template
 
     # ---- 7. first person for the five replaced weapons (1.1.0): their WNAM named vanilla's Steel first-person statics,
     # which the Steel weapons share, so in first person they showed vanilla steel. Each gets its own static (vanilla's
@@ -617,7 +654,7 @@ def main():
                 continue
             ssubs.append((s, v))
         check_refs("STAT", ssubs, sky_ix, stat_edid)
-        records.append(("STAT", stat_fid, st["ver"], ssubs))
+        records.append(("STAT", stat_fid, st["ver"], ssubs, hdr(st)))
         subs[wi[0]] = (b"WNAM", struct.pack("<I", stat_fid))
         new_weapon_meshes.append(mesh1)
 
@@ -626,7 +663,7 @@ def main():
     # ships; any item still at zero refuses the build. See ground_model_bounds.
     loy_meshes = os.path.join(os.path.dirname(os.path.abspath(a.loy)), "meshes")
     bounds_written = []
-    for rtype, fid, ver, subs in records:
+    for rtype, fid, ver, subs, _f in records:
         if rtype not in ("ARMO", "WEAP", "AMMO"):
             continue
         edid = next(v.split(b"\x00")[0].decode("latin-1") for s, v in subs if s == b"EDID")
@@ -642,11 +679,17 @@ def main():
         ob = ground_model_bounds(model, loy_meshes)
         subs[oi[0]] = (b"OBND", struct.pack("<6h", *ob))
         bounds_written.append((edid, model, ob))
-    for rtype, fid, ver, subs in records:
+    for rtype, fid, ver, subs, _f in records:
         if rtype in ("ARMO", "WEAP", "AMMO"):
             v = next(v for s, v in subs if s == b"OBND")
             if not any(struct.unpack("<6h", v)):
                 fail("%08X (%s) would ship with all-zero OBND" % (fid, rtype))
+
+    # ---- 9. every shield (an ARMO on body slot 39) carries the ARMO "Shield" header flag - see hdr()
+    for rtype, fid, ver, subs, rflags in records:
+        if rtype == "ARMO" and body_slots(subs) & SLOT_39 and not rflags & ARMO_SHIELD:
+            fail("%08X is a slot-39 armour without the Shield flag (0x40) - shield-on-back mods would leave it on the arm"
+                 % fid)
 
     # ---- emit, one group per type
     order =["ARMA", "ARMO", "STAT", "PROJ", "WEAP", "AMMO", "COBJ"]
@@ -654,9 +697,9 @@ def main():
     counts = {}
     for rtype in order:
         payload = bytearray()
-        for t, fid, ver, subs in sorted((r for r in records if r[0] == rtype), key=lambda r: r[1]):
+        for t, fid, ver, subs, rflags in sorted((r for r in records if r[0] == rtype), key=lambda r: r[1]):
             body = pack(subs)
-            payload += (t.encode("latin-1") + struct.pack("<IIIIHH", len(body), 0, fid, 0, ver, 0) + body)
+            payload += (t.encode("latin-1") + struct.pack("<IIIIHH", len(body), rflags, fid, 0, ver, 0) + body)
             counts[rtype] = counts.get(rtype, 0) + 1
         groups += (b"GRUP" + struct.pack("<I", len(payload) + 24) + rtype.encode("latin-1")
                    + struct.pack("<iii", 0, 0, 0) + payload)
