@@ -4,32 +4,13 @@
 	<moduleName>Nordic Skyforged Armor and Weapons</moduleName>
 	<moduleImage path="fomod\images\header.png" showImage="true" showFade="true" height="-1" />
 
-	<!-- The meshes and the TruePBR textures (the plugin is the "Plugin" step's ESP option) (our black recolour of NordwarUA's own maps; one set, as he
+	<!-- The meshes, the light plugin and the TruePBR textures (our black recolour of NordwarUA's own maps; one set, as he
 	     ships one resolution) are the same whatever you pick below, so they install once. -->
 	<requiredInstallFiles>
 		<folder source="00 Core" destination="" priority="0" />
 	</requiredInstallFiles>
 
 	<installSteps order="Explicit">
-		<installStep name="Plugin">
-			<optionalFileGroups order="Explicit">
-				<group name="Plugin or SkyPatcher" type="SelectExactlyOne">
-					<plugins order="Explicit">
-						<plugin name="ESP version (recommended)">
-							<description>The full mod: a light plugin (ESL-flagged, it takes no load-order slot) that adds the Skyforge Steel armour set, mace, warhammer, bow and arrows, all made only at the Skyforge, and gives vanilla's five Skyforge Steel weapons our look.</description>
-							<files><folder source="01 Plugin - ESP" destination="" priority="1" /></files>
-							<typeDescriptor><type name="Recommended" /></typeDescriptor>
-						</plugin>
-						<plugin name="No ESP - SkyPatcher">
-							<description>No plugin, and much less: REQUIRES SkyPatcher (https://www.nexusmods.com/skyrimspecialedition/mods/106659), which edits existing records at game start but cannot add new ones. So this option ONLY gives vanilla's five Skyforge Steel weapons (sword, dagger, greatsword, battleaxe, war axe) our look; their stats, names and how you get them stay vanilla. NOT included: the armour set, the mace, warhammer, bow and arrows, and every recipe at the Skyforge - those are new items and need the ESP version.</description>
-							<files><folder source="02 Plugin - SkyPatcher" destination="" priority="1" /></files>
-							<typeDescriptor><type name="Optional" /></typeDescriptor>
-						</plugin>
-					</plugins>
-				</group>
-			</optionalFileGroups>
-		</installStep>
-
 		<installStep name="Body">
 			<optionalFileGroups order="Explicit">
 				<group name="Female body" type="SelectExactlyOne">
