@@ -1,7 +1,7 @@
 # Whose work this is
 
 **The art is NordwarUA's.** This mod is a mapping job: it takes his steel Wolf armour set and weapons from Legacy of
-Ysgramor and puts them where the game's Skyforge Steel gear sits. Since 1.1.0 the textures are **his own textures
+Ysgramor and puts them where the game's Skyforge Steel gear sits. The textures are **his own textures
 recoloured all-black and made into TruePBR materials** by our build scripts. All of it is modification and asset use of
 Legacy of Ysgramor under its permissions (below): with credit to NordwarUA as the original creator, on Nexus only,
 never sold.
@@ -29,7 +29,7 @@ derives the material list from the meshes it is shipping. The texture paths insi
 mod's own folder, `textures\pbr\NordicSkyforge\`, so installing it next to Legacy of Ysgramor leaves that mod's Wolf
 Armor exactly as it was.
 
-## The new weapon types (1.1.0 on)
+## The new weapon types
 
 The Skyforge Steel Mace (and the weapon types that follow it) is assembled at build time by
 `tools/build-missing-weapons.py` from pieces of NordwarUA's steel war axe in the same Legacy of Ysgramor download, each
@@ -37,6 +37,14 @@ piece keeping its own texture; the node tree, blood shapes and collision it is b
 mace in the player's Skyrim - Meshes BSA. The bow is built by the Nordic Ebony replacer's own pipeline from
 NordwarUA's ebony Wolf weapons in the same download (the same sword mesh as the steel one), then given this mod's steel
 materials. The repository carries none of these files.
+
+## The full-3D main file (1.0.0)
+
+The 3D download is the flat package with geometry added by our own tools (`tools/full3d/`): the modelled mail rings,
+and the raised rivets, studs, buckles, straps and lamellar scales, placed where NordwarUA's own textures and shine masks
+show them, on his meshes and UVs. The added shapes are textured from his maps (recoloured as above), so this is the same
+modification and asset use of Legacy of Ysgramor, under the same permissions and credit. Its CBBE 3BA and HIMBO fits are
+the fits described below, with the added shapes conformed the same way.
 
 ## The CBBE 3BA BodySlide files - Legacy of Ysgramor - 3BA Bodyslide
 
@@ -52,7 +60,7 @@ The installer's Body step offers, beside the vanilla bodies (the default), CBBE 
 
 [Nexus 110002](https://www.nexusmods.com/skyrimspecialedition/mods/110002), **Legacy of Ysgramor - HIMBO Conversion**
 by **Trexasle**, asks for his permission before its assets are used, so it is not packaged here (it was an option
-before 1.1.0 was posted). The mod page points HIMBO players at his page.
+before the first public release). The mod page points HIMBO players at his page.
 
 ## What IS ours
 
@@ -75,8 +83,8 @@ permission" is not shipped until a written permission is recorded here.
 | Legacy of Ysgramor - My patches and fixes (Wolf Black, Full Collar Black) | 111121 | Xtudo | Permissions read 2026-11-15: modification and asset use need his permission; no donation points on mods using his assets | **No** - not read by the build, not shipped (up to the unposted 1.1.0 builds of 2026-11-15 his black diffuses were used; replaced by our own recolour of NordwarUA's originals) |
 
 The NordwarUA box in full, read 2026-11-12 (the owner: this mod "has permission for use since this is the mod its
-from" - the same permission applies to both of our mods built from that source, Nordic Ebony Armor and Weapons
-Replacer and Nordic Skyforged Armor and Weapons):
+from" - the same permission applies to both of our mods built from that source, Truly Nordic Ebony Armor and Weapons
+and Truly Nordic Skyforged Armor and Weapons):
 
 - Other user's assets: all the assets belong to the author or are free-to-use modder's resources.
 - **Modification permission: allowed** - "You are allowed to modify my files and release bug fixes or improve on the

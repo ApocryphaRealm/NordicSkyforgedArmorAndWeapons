@@ -1,13 +1,33 @@
-# Changelog - Nordic Skyforged Armor and Weapons
+# Changelog - Truly Nordic Skyforged Armor and Weapons
 
-## 1.1.0 - 2026-11-15 - working
+## 1.0.0 - 2026-11-16 - untested
+
+First public release, under the new name Truly Nordic Skyforged Armor and Weapons (it was Nordic Skyforged Armor and
+Weapons while in development; the plugin is renamed to match: `Truly Nordic Skyforged Armor and Weapons.esp`, still a
+light plugin). The plugin installs with the core - there is no no-ESP option, as the armour, the new weapon types and
+their recipes are new records SkyPatcher cannot create.
 
 ### Added
+- Two downloads. The MAIN file is the full-3D set: the chain mail is modelled ring by ring (each ring linked four-in-one
+  to its neighbours), and the rivets, studs, buckles, straps and lamellar scales are raised geometry on the helmet,
+  cuirass, gauntlets, boots, shield and weapons. The OPTIONAL file is the flat set - the same armour with the mail as a
+  TruePBR material instead of modelled rings - for big battles or older PCs. Measured in one launch: ten NPCs in the 3D
+  set against the same ten in the flat set cost about 0.8-1.1 ms of GPU time, hidden in a CPU-bound scene (the frame
+  time stayed within noise); first-person mail has no measurable cost. Both are FOMOD installers with the same body
+  choices (tools/build-package.py builds both; tools/package3d.py lays the 3D build from tools/full3d/ over the flat
+  package).
+- Our own body fits, made by running BodySlide ourselves: CBBE 3BA for the female set (meshes prebuilt at 3BA's zeroed
+  sliders, plus the BodySlide project to build your own preset, slider data in our own files) and HIMBO for the male
+  set (HIMBO's own Vanilla-to-HIMBO conversion with every HIMBO slider conformed onto the armour, meshes prebuilt with
+  "HIMBO Default", plus the project). The 3D download ships them fitted to the 3D set. Vanilla bodies stay the default.
+  Trexasle's HIMBO conversion is not used.
+- A picture on every body option in the installer (vanilla female, CBBE 3BA, vanilla male, HIMBO); the HIMBO option had
+  none.
 - A Skyforge Steel Bow - the Nordic Ebony replacer's bow (its approved design: the Wolf sword's blades bent into recurved limbs, a round braided collar at each end of the grip, round limb roots easing into the flat limb, one mounted claw per limb, the string's loops seated in notches at the tips, an arrow shelf, fitted to the vanilla bow rig and closed so no light shows through) on this set's own steel textures: the steel sword's for the limbs, grip, collars and claws, and the steel war axe's braided grip for the string. A new record (the game has no steel bow): the Imperial Bow, the game's steel-tier bow, with the two-handed Skyforge uplift - damage 12, value 140 - forged at the Skyforge with Steel Smithing from 3 steel ingots and 1 leather strips, tempered with a steel ingot; its first-person record uses the same model, as vanilla's bows do.
 - Skyforge Steel Arrows, with their quiver and the arrow in flight - the Nordic Ebony arrow and quiver re-made from NordwarUA's own steel war axe and steel dagger: the axe's spike above its bit as the head, its back fang as three vanes, its braided grip as the shaft, a slotted steel nock (the slot across the arrow, square to the cock vane) with the axe's collar ring where it meets the shaft; the quiver is the steel dagger's scabbard scaled up, with the collar ring round its mouth and the back fang as a plate, decorated side out and the ring against the back, holding six of the same arrows (one shape each, so the game hides them one by one as they are used). Head, vanes and collar are closed so no light shows through. A new arrow (the game has no Skyforge Steel arrow): the vanilla Steel Arrow with the weapons' Skyforge pattern - damage 13, value 3 - and its own projectile, forged at the Skyforge with Steel Smithing, 24 from a steel ingot and a firewood.
 - A Skyforge Steel Warhammer - the Nordic Ebony warhammer's design re-made from NordwarUA's own STEEL battle axe: the battle axe without its bit (haft, socket, top spike and back fang as they are), the axe's steel butt - its studded cuff and moulded end cap - turned forward as the hammer, cut flat at its widest point and carried on as a short round extension of the cap's own moulding with a 45-degree lip, ending in a flat circular striking face of square pyramid teeth (the Ebony face's 193 teeth, each facet with its own vertices so it lights as teeth, on blade steel whose normal map is flat), and the axe's collar ring where the hammer meets the socket. Same face size and reach as the Ebony warhammer. A new record: the vanilla Steel Warhammer with the game's two-handed Skyforge uplift (damage 23, value 160, weight 25), forged at the Skyforge with Steel Smithing from the Steel Warhammer's ingredients, tempered with a steel ingot; its own first-person model and static.
 - A Skyforge Steel Mace - the first of the weapon types the game has no Skyforge version of (the same set the Nordic Ebony replacer gained: mace, warhammer, bow, arrows and quiver), built one at a time. It is the Nordic Ebony mace's recipe re-made from NordwarUA's own STEEL war axe in Legacy of Ysgramor: the axe's haft, socket, collar, braided grip and pommel; a second twist-langet tube as the head core; the axe's knotwork bit six times round it as flanges; the axe's collar ring as the top and lower bands; and the axe's spike as the crown point - each piece keeping its own texture on the steel axe's atlas (which this mod already ships; no new texture). Sized to match the Ebony mace's head. A new record (the game has no Skyforge mace): the vanilla Steel Mace with the game's own Skyforge uplift over Steel (damage 13, value 90, weight 14), forged at the Skyforge with Steel Smithing from the Steel Mace's ingredients and tempered with a steel ingot like the Skyforge war axe. It has its own first-person model and static. Built by tools/build-missing-weapons.py from the Legacy of Ysgramor download and the game's own meshes at build time - the repository carries no art.
-- Installer pictures, rendered from this mod's own built meshes: the header (the outfit and every weapon - sword, greatsword, war axe, battleaxe, dagger, mace, warhammer, bow, the quiver of arrows and the shield - drawn, with the steel lit as the game lights it) and the HIMBO and CBBE 3BA options.
+- Installer pictures, rendered from this mod's own built meshes: the header (the outfit and every weapon - sword, greatsword, war axe, battleaxe, dagger, mace, warhammer, bow, the quiver of arrows and the shield - drawn, with the steel lit as the game lights it) and every body option.
 
 ### Changed
 - The all-black look is now our own recolour of NordwarUA's original textures (tools/recolour_black.py): the red and brown cloth, tabard, leather straps, hafts and shield planks and the fur go black-grey; the grey steel and his damascus-look detail stay as he painted them. Xtudo's black colourway (Legacy of Ysgramor - My patches and fixes) needs his permission to use, so none of his files is read or shipped any more.
@@ -22,18 +42,25 @@
 - Mods that rescale every arrow (Archery Rebalance, for one) change the arrow's damage in game: its 13 shows as 11 there, as the vanilla Steel Arrow's 10 shows as 9.
 
 ### Removed
-- The HIMBO options (prebuilt meshes and HIMBO BodySlide files): Legacy of Ysgramor - HIMBO Conversion asks for its author's permission before its assets are used. The mod page points HIMBO players at it. The CBBE 3BA BodySlide files stay (its page gives Legacy of Ysgramor's own terms).
+- Trexasle's HIMBO conversion (Legacy of Ysgramor - HIMBO Conversion asks for its author's permission before its assets are used): the HIMBO and CBBE 3BA options are our own fits now (see Added).
 - The 1K / 2K / 4K texture choice: NordwarUA ships one resolution, so one texture set installs with the core.
 
 ### Fixed
-- The Skyforge Steel Shield is now marked as a shield, as the game's own shields are, so shield-on-back mods such as Simple Dual Sheath put it on your back when it is sheathed instead of leaving it on your arm. Its worn model now also has a female version (the same model, as the vanilla shields have) and fits Draugr as the vanilla shields do.
+- The Skyforge Steel Shield is now marked as a shield (the record's Shield flag, 0x40), as the game's own shields are, so shield-on-back mods such as Simple Dual Sheath put it on your back when it is sheathed instead of leaving it on your arm. Its worn model now also has a female version (the same model, as the vanilla shields have) and fits Draugr as the vanilla shields do.
 - The Skyforge Steel Shield now has object bounds, worked out from its model as it ships; it had none (zero, carried over from Legacy of Ysgramor's shield record), the likely reason Immersive Equipment Displays did not show it on your back when favourited and unequipped while the vanilla shields showed.
 - The fur collar is a black-grey fur with visible strands again instead of a flat black shape.
 - Build: tools/build-package.py moved an existing package folder aside instead of deleting it (it used to delete it outright).
 
-## 1.0.0
+## Before the first public release
 
-First release. The owner, 2026-09-16: *"i want to replace skyforged weapons and add skyforged armor,
+1.0.0 is the first public version (the owner, 2026-11-16: the pages are made again from scratch "set to 1.0 as its
+first upload to Nexus"). The builds below were development builds that were never public - one was uploaded under
+another number to a page that was never published. They used Xtudo's black colourway and Trexasle's HIMBO conversion,
+neither of which is in 1.0.0. Kept as history.
+
+### First development build (numbered 1.0.0 at the time, 2026-09-17)
+
+First build. The owner, 2026-09-16: *"i want to replace skyforged weapons and add skyforged armor,
 leave wolf alone"*, and *"SKYFORGED IS BUILT FROM LEGACY OF YSGRAMOR WOLF ARMOR and skyforged weapons"*.
 
 * NordwarUA's steel wolf weapons from Legacy of Ysgramor on the five vanilla Skyforge Steel weapons -

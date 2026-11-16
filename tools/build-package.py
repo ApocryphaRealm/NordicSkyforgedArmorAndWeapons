@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-r"""Assemble the FOMOD package for Nordic Skyforged Armor and Weapons.
+r"""Assemble the FOMOD packages for Truly Nordic Skyforged Armor and Weapons (named Nordic Skyforged Armor and Weapons
+until 2026-11-16).
+
+TWO PACKAGES SINCE 1.0.0 (the owner, 2026-11-16: the 3D build is the MAIN file, the flat build the OPTIONAL file)
+    <version folder>\Flat\   the texture-only set described below - built here from the Nexus downloads;
+    <version folder>\3D\     the same package with the full-3D build laid over it (every mail ring, rivet, stud, buckle,
+                             strap and lamellar scale modelled; 3D CBBE 3BA / HIMBO fits) - tools/package3d.py, which
+                             refuses a 3D build made from other meshes than the flat package ships (--rebuild-3d
+                             rebuilds it with tools/full3d/).
+    Each is its own FOMOD with the same body choices. 11. Nexus distro\<mod>\nexus-files.json names them for the upload.
 
 WHAT THIS PACKAGES
     NordwarUA's steel wolf armour and weapons from Legacy of Ysgramor (Nexus 109963), under this
@@ -29,7 +38,7 @@ WHAT IT REFUSES TO DO
     * ship if the path rewrite would change a mesh's length;
     * ship if any folder ModuleConfig.xml installs from is missing or empty, or an image is absent.
 
-Usage:  python tools/build-package.py [output folder] [--test]
+Usage:  python tools/build-package.py [version folder] [--test] [--flat-only] [--rebuild-3d]
 """
 import os
 import re
@@ -49,7 +58,9 @@ A_FURFIX = "Patch Fur Lighting Bug-109963"     # NordwarUA - corrected FurCollar
 PBR_FOLDER = "NordicSkyforge"                 # textures\pbr\NordicSkyforge\
 MAX_DDS = 2048
 
-PLUGIN = "Nordic Skyforged Armor and Weapons.esp"
+MOD_NAME = "Truly Nordic Skyforged Armor and Weapons"
+PLUGIN = MOD_NAME + ".esp"
+FLAT, FULL3D = "Flat", "3D"        # the two packages' folders (zips: "<mod> <ver> - Flat.zip" / "- 3D.zip")
 SRC_MESH = "meshes/NordWar/Companions"
 OLD_TEX = b"textures\\NordWar\\Companions\\"
 NEW_TEX = b"textures\\NordicSkyforge\\Set\\"
@@ -57,7 +68,7 @@ assert len(OLD_TEX) == len(NEW_TEX)
 TEX_RE = re.compile(rb"textures[\\/]NordWar[\\/]Companions[\\/]", re.IGNORECASE)
 TEXPAT = re.compile(rb"[Tt]extures.{1,180}?\.dds")
 VANILLA_TEXTURES = ("textures\\blood\\", "textures\\cubemaps\\")
-IMAGES = ("header.png", "cbbe3ba.png")   # rendered from a built package by tools/installer-images.py
+IMAGES = ("header.png", "vanilla_f.png", "vanilla_m.png", "cbbe3ba.png", "himbo.png")   # rendered from a built package by tools/installer-images.py
 
 
 def supersede(folder):
@@ -151,13 +162,36 @@ def ci_find(root, rel):
     return cur
 
 
-def main(out_root=None, test=False):
+def main(version_root=None, test=False, flat_only=False, rebuild_3d=False):
+    """Both packages under <version_root>: Flat\\ built from the downloads, then 3D\\ from it (tools/package3d.py)."""
     ver = version()
-    if out_root is None:
-        out_root = os.path.normpath(os.path.join(REPO, "..", "..", "7. current test builds",
-                                                 "Nordic Skyforged Armor and Weapons %s" % ver))
-    if os.path.isdir(out_root):
-        supersede(out_root)     # never deleted (2026-10-25); this script used to shutil.rmtree it
+    if version_root is None:
+        version_root = os.path.normpath(os.path.join(REPO, "..", "..", "7. current test builds",
+                                                     "Skyrim - " + MOD_NAME, "%s %s" % (MOD_NAME, ver)))
+    if os.path.isdir(version_root):
+        supersede(version_root)     # never deleted (2026-10-25); this script used to shutil.rmtree it
+    flat = build_flat(os.path.join(version_root, FLAT), test)
+    if flat_only:
+        print("  --flat-only: no 3D package built. Not shippable as a release.")
+        return version_root
+    import package3d
+    out3d = package3d.make("skyforged", flat, os.path.join(version_root, FULL3D), rebuild_3d=rebuild_3d)
+    set_module_name(flat, MOD_NAME + " - Flat textures")
+    set_module_name(out3d, MOD_NAME)
+    return version_root
+
+
+def set_module_name(pkg, name):
+    p = os.path.join(pkg, "fomod", "ModuleConfig.xml")
+    t = open(p, encoding="utf-8").read()
+    t2 = re.sub(r"<moduleName>[^<]*</moduleName>", "<moduleName>%s</moduleName>" % name, t, count=1)
+    if t2 == t and ("<moduleName>%s</moduleName>" % name) not in t:
+        fail("no <moduleName> in %s" % p)
+    open(p, "w", encoding="utf-8", newline="").write(t2)
+
+
+def build_flat(out_root, test=False):
+    ver = version()
     work = os.path.join(out_root, "_work")
 
     base = extract(A_BASE, os.path.join(work, "base"))
@@ -290,7 +324,7 @@ def main(out_root=None, test=False):
                 fail("installer image '%s' is missing. Pass --test to build anyway for local testing." % img)
             continue
         shutil.copy2(s, os.path.join(fomod, "images", img))
-    for name in ("NOTICE.md", "CHANGELOG.md", "LICENSE"):
+    for name in ("README.md", "NOTICE.md", "CHANGELOG.md", "LICENSE"):
         shutil.copy2(os.path.join(REPO, name), os.path.join(out_root, name))
 
     root = ET.parse(os.path.join(fomod, "ModuleConfig.xml")).getroot()
@@ -317,9 +351,11 @@ def main(out_root=None, test=False):
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if a != "--test"]
+    flags = {"--test", "--flat-only", "--rebuild-3d"}
+    args = [a for a in sys.argv[1:] if a not in flags]
     is_test = "--test" in sys.argv[1:]
-    main(args[0] if args else None, test=is_test)
+    main(args[0] if args else None, test=is_test, flat_only="--flat-only" in sys.argv[1:],
+         rebuild_3d="--rebuild-3d" in sys.argv[1:])
     if is_test:
         print()
         print("  *** --test: built WITHOUT the installer images. Not shippable. ***")

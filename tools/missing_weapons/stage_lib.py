@@ -66,7 +66,7 @@ def check_parts(P, expected_json):
 
 def harden(o, deg=35.0):
     """the Ebony build_stage.py harden(): split every edge sharper than deg so each facet has its own vertices (PyNifly
-    exports one normal per vertex; the Ebony warhammer's teeth drew as a flat disc until this, 1.1.0 2026-11-14)"""
+    exports one normal per vertex; the Ebony warhammer's teeth drew as a flat disc until this, 2026-11-14)"""
     bm = bmesh.new(); bm.from_mesh(o.data)
     sharp = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0.0) > math.radians(deg)]
     bmesh.ops.split_edges(bm, edges=sharp)
@@ -236,7 +236,7 @@ def make_blood(srcs, ylo, name, uvbox, offset=0.012, cap=900):
     return b
 
 
-# ---- the Ebony build_stage.py's piece-closing functions, unchanged (bow and arrow light-through, 1.1.0 2026-11-14)
+# ---- the Ebony build_stage.py's piece-closing functions, unchanged (bow and arrow light-through, 2026-11-14)
 def cap_holes(o):
     """Close every open boundary of a piece. The pieces are cut from the Wolf weapons, where an open end sat hidden inside
     the next piece (a blade's base in its guard, the axe spike's foot in the head); re-used elsewhere the hole shows, and
@@ -297,7 +297,7 @@ def cap_holes(o):
 def weld_join(objs, name, **props):
     """pieces that meet along their rims (a fang cut into five parts, an arrowhead in four) joined and welded into ONE
     piece before cap_holes: capped apart, their caps met back to back inside and the welded edges they share had three or
-    more faces - the surface could not be told inside from outside (the arrowhead came out inside-out, 1.1.0 2026-11-14)"""
+    more faces - the surface could not be told inside from outside (the arrowhead came out inside-out, 2026-11-14)"""
     tex = {o["tex"] for o in objs}; assert len(tex) == 1, (name, tex)
     j = join(list(objs), name)
     bm = bmesh.new(); bm.from_mesh(j.data); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)

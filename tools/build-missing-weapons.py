@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 r"""Build the game meshes of the Skyforge Steel weapon types the game has no Skyforge version of - the same set the
-Nordic Ebony Armor and Weapons Replacer gained in 1.1.0 (mace, warhammer, bow, arrows and quiver), built one at a time
+Truly Nordic Ebony Armor and Weapons set gained (mace, warhammer, bow, arrows and quiver), built one at a time
 (the owner, 2026-11-15: "start building the other weapon types that we haven't built yet. Just do them one at a time").
 
 BUILT SO FAR

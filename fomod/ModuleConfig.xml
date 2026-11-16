@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
-	<moduleName>Nordic Skyforged Armor and Weapons</moduleName>
+	<moduleName>Truly Nordic Skyforged Armor and Weapons</moduleName>
 	<moduleImage path="fomod\images\header.png" showImage="true" showFade="true" height="-1" />
 
 	<!-- The meshes, the light plugin and the TruePBR textures (our black recolour of NordwarUA's own maps; one set, as he
@@ -17,6 +17,7 @@
 					<plugins order="Explicit">
 						<plugin name="Vanilla female body">
 							<description>The set as NordwarUA fitted it, for the vanilla female body.</description>
+							<image path="fomod\images\vanilla_f.png" />
 							<files />
 							<typeDescriptor><type name="Recommended" /></typeDescriptor>
 						</plugin>
@@ -35,11 +36,13 @@
 					<plugins order="Explicit">
 						<plugin name="Vanilla male body">
 							<description>The set as NordwarUA fitted it, for the vanilla male body.</description>
+							<image path="fomod\images\vanilla_m.png" />
 							<files />
 							<typeDescriptor><type name="Recommended" /></typeDescriptor>
 						</plugin>
 						<plugin name="HIMBO">
 							<description>The male set fitted to HIMBO by us (HIMBO's own Vanilla-to-HIMBO conversion, then every HIMBO slider conformed onto the armour): meshes prebuilt with the "HIMBO Default" preset, RaceMenu / OBody morphs included, and the BodySlide project (group "Nordic Skyforged - HIMBO", also listed under HIMBO) to build it to your own preset.</description>
+							<image path="fomod\images\himbo.png" />
 							<files>
 								<folder source="34 BodySlide - HIMBO" destination="" priority="2" />
 								<folder source="36 HIMBO meshes" destination="" priority="2" />

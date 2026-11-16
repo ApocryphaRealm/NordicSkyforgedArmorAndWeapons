@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-r"""Generate the light plugin for Nordic Skyforged Armor and Weapons.
+r"""Generate the light plugin for Truly Nordic Skyforged Armor and Weapons (Nordic Skyforged Armor and Weapons until 2026-11-16).
 
 WHAT THE PLUGIN DOES
     Two things, in one ESPFE (a .esp carrying the light flag, so it costs no load-order slot and
@@ -8,7 +8,7 @@ WHAT THE PLUGIN DOES
     1. REPLACES the five vanilla Skyforge Steel weapons' models with NordwarUA's steel wolf
        weapons from Legacy of Ysgramor: the sword, greatsword, war axe, battleaxe and dagger.
        Everything else about those records - damage, value, keywords, sounds - stays vanilla,
-       because the body is copied from Skyrim.esm and only MODL changes - and, since 1.1.0, WNAM, which
+       because the body is copied from Skyrim.esm and only MODL changes - and, since the 2026-11-15 build, WNAM, which
        names each weapon's own first-person static (section 7) instead of vanilla Steel's shared one.
 
     2. ADDS a Skyforge Steel armour set - cuirass, boots, gauntlets, helmet and shield - built
@@ -51,7 +51,7 @@ REPO = os.path.normpath(os.path.join(HERE, ".."))
 GAME_DATA = os.environ.get("SKYRIM_DATA", r"D:\modlists\Njordlinger\Stock Game\Data")
 LOY_DEFAULT = os.environ.get("LOY_PLUGIN", r"D:\modlists\Njordlinger\mods\Legacy of Ysgramor\NW_Companions_Replacer_Light.esp")
 
-PLUGIN_NAME = "Nordic Skyforged Armor and Weapons.esp"
+PLUGIN_NAME = "Truly Nordic Skyforged Armor and Weapons.esp"
 AUTHOR = "ApocryphaRealm"
 DESCRIPTION = ("NordwarUA's steel wolf weapons on the Skyforge Steel weapons, and a Skyforge Steel "
                "armour set built from his steel wolf armour.")
@@ -160,7 +160,7 @@ def fail(msg):
     raise SystemExit("build-esp: " + msg)
 
 
-# Record-header flags are carried from each record's template (1.1.0 fix). Until then every record was written with
+# Record-header flags are carried from each record's template (fixed before the first public release). Until then every record was written with
 # flags 0, so the Skyforge Steel Shield lost the ARMO "Shield" flag (0x40) that ArmorEbonyShield and Legacy of
 # Ysgramor's NW_Wolf_Shield_Steel carry; Simple Dual Sheath's shield-on-back reads it, and the owner saw our sheathed
 # shield stay on the arm while the Ebony Shield went to the back (2026-11-16). The compressed bit is dropped (we write
@@ -261,7 +261,7 @@ GROUND_MODEL_STEPS = {"nordicskyforge\\weapons\\shieldsteel.nif": _resize_shield
 
 
 def ground_model_bounds(model, loy_meshes):
-    """OBND for an item whose template carries none (1.1.0: the Skyforge Steel Shield shipped 0,0,0 / 0,0,0 because
+    """OBND for an item whose template carries none (2026-11-16: the Skyforge Steel Shield shipped 0,0,0 / 0,0,0 because
     Legacy of Ysgramor's own shield record has zero bounds - with Immersive Equipment Displays the favourited shield did
     not show on the back while the vanilla-record Ebony Shield did). Computed the way the Creation Kit does: the extents
     of every vertex of every shape in the model's root frame, rounded outward to whole units (int16).
@@ -629,7 +629,7 @@ def main():
         check_refs("COBJ", subs, sky_ix, "Recipe" + our_edid)
         records.append(("COBJ", rfid, temper_ver, subs, 0))       # written here, no template
 
-    # ---- 7. first person for the five replaced weapons (1.1.0): their WNAM named vanilla's Steel first-person statics,
+    # ---- 7. first person for the five replaced weapons (2026-11-15): their WNAM named vanilla's Steel first-person statics,
     # which the Steel weapons share, so in first person they showed vanilla steel. Each gets its own static (vanilla's
     # copied, model swapped) on tools/build-missing-weapons.py's first-person copy of its model. Allotted LAST so every
     # 1.0.0 FormID stays where it was.
@@ -658,7 +658,7 @@ def main():
         subs[wi[0]] = (b"WNAM", struct.pack("<I", stat_fid))
         new_weapon_meshes.append(mesh1)
 
-    # ---- 8. object bounds (1.1.0 fix): every item carries real OBND. A template with all-zero bounds (Legacy of
+    # ---- 8. object bounds (fixed before the first public release): every item carries real OBND. A template with all-zero bounds (Legacy of
     # Ysgramor's NW_Wolf_Shield_Steel, copied for the shield) gets them computed from the item's own ground model as it
     # ships; any item still at zero refuses the build. See ground_model_bounds.
     loy_meshes = os.path.join(os.path.dirname(os.path.abspath(a.loy)), "meshes")
