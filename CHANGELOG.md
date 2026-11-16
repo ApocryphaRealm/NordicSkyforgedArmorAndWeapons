@@ -20,7 +20,8 @@ their recipes are new records SkyPatcher cannot create.
   sliders, plus the BodySlide project to build your own preset, slider data in our own files) and HIMBO for the male
   set (HIMBO's own Vanilla-to-HIMBO conversion with every HIMBO slider conformed onto the armour, meshes prebuilt with
   "HIMBO Default", plus the project). The 3D download ships them fitted to the 3D set. Vanilla bodies stay the default.
-  Trexasle's HIMBO conversion is not used.
+  Trexasle's HIMBO conversion is not used. In BodySlide the projects are the groups "Truly Nordic Skyforged - CBBE 3BA" and
+  "Truly Nordic Skyforged - HIMBO".
 - A picture on every body option in the installer (vanilla female, CBBE 3BA, vanilla male, HIMBO); the HIMBO option had
   none.
 - A Skyforge Steel Bow - the Nordic Ebony replacer's bow (its approved design: the Wolf sword's blades bent into recurved limbs, a round braided collar at each end of the grip, round limb roots easing into the flat limb, one mounted claw per limb, the string's loops seated in notches at the tips, an arrow shelf, fitted to the vanilla bow rig and closed so no light shows through) on this set's own steel textures: the steel sword's for the limbs, grip, collars and claws, and the steel war axe's braided grip for the string. A new record (the game has no steel bow): the Imperial Bow, the game's steel-tier bow, with the two-handed Skyforge uplift - damage 12, value 140 - forged at the Skyforge with Steel Smithing from 3 steel ingots and 1 leather strips, tempered with a steel ingot; its first-person record uses the same model, as vanilla's bows do.
